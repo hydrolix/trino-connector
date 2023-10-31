@@ -6,7 +6,7 @@ import java.{lang => jl, util => ju}
 import scala.beans.BeanProperty
 import scala.jdk.CollectionConverters._
 
-import com.fasterxml.jackson.annotation.{JsonCreator, JsonProperty, JsonValue}
+import com.fasterxml.jackson.annotation.{JsonCreator, JsonProperty}
 import io.trino.spi.`type`.{TimeZoneKey, Type}
 import io.trino.spi.connector._
 import io.trino.spi.security.ConnectorIdentity
@@ -54,15 +54,7 @@ final class HdxTrinoConnector(val info: HdxConnectionInfo, val catalog: HdxTable
     HdxTrinoTransactionHandle.INSTANCE
   }
 
-  override def getPageSourceProvider: ConnectorPageSourceProvider = super.getPageSourceProvider
-}
-
-case class HdxTableHandle(
-  @JsonProperty @BeanProperty var    db: String,
-  @JsonProperty @BeanProperty var table: String
-) extends ConnectorTableHandle {
-  @JsonCreator
-  def this() = this(null, null)
+  override def getPageSourceProvider: ConnectorPageSourceProvider = new HdxTrinoPageSourceProvider(info, catalog)
 }
 
 case class HdxColumnHandle(

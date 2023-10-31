@@ -23,7 +23,7 @@ final class HdxTrinoConnectorMetadata(val catalog: HdxTableCatalog) extends Conn
   }
 
   override def getTableHandle(session: ConnectorSession, tableName: SchemaTableName): ConnectorTableHandle = {
-    HdxTableHandle(tableName.getSchemaName, tableName.getTableName)
+    new HdxTableHandle(tableName.getSchemaName, tableName.getTableName)
   }
 
   override def getTableMetadata(session: ConnectorSession, table: ConnectorTableHandle): ConnectorTableMetadata = {

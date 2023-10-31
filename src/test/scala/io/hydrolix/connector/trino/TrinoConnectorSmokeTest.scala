@@ -20,12 +20,10 @@ class TrinoConnectorSmokeTest {
 
     val info = HdxConnectionInfo(jdbcUrl, user, pass, new URI(apiUrl), None, cloudCred1, cloudCred2, Some("myubuntu"))
 
-    val session = HdxTrinoConnectorSession()
-    val cfac = new HdxTrinoConnectorFactory()
-    val connector = cfac.create("hydrolix", info.asMap.asJava, null)
+    val session = HdxTrinoConnectorSession(info)
+    val connector = HdxTrinoConnectorFactory.create("hydrolix", info.asMap.asJava, null)
     println(connector)
-    val meta = connector.getMetadata(session, HdxTrinoTransactionHandle)
+    val meta = connector.getMetadata(session, HdxTrinoTransactionHandle.INSTANCE)
     println(meta.listTables(session, Optional.of("hydro")))
-
   }
 }

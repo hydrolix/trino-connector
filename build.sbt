@@ -1,6 +1,6 @@
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
-ThisBuild / scalaVersion := "2.13.11"
+ThisBuild / scalaVersion := "2.13.12"
 
 ThisBuild / javacOptions ++= Seq("-source", "17", "-target", "17")
 
@@ -35,4 +35,3 @@ libraryDependencies := Seq(
   "com.github.sbt" % "junit-interface" % "0.13.3" % Test,
   "io.trino" % "trino-spi" % "430" % Test,
 )
-
