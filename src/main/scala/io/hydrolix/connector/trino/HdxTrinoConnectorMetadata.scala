@@ -1,10 +1,14 @@
 package io.hydrolix.connector.trino
 
+import java.time.Instant
 import java.{util => ju}
 import scala.jdk.CollectionConverters._
 import scala.jdk.OptionConverters._
 
+import io.trino.spi.`type`.TimestampType
+import io.trino.spi.block.LongArrayBlock
 import io.trino.spi.connector._
+import io.trino.spi.predicate.{SortedRangeSet, TupleDomain}
 import org.slf4j.LoggerFactory
 
 import io.hydrolix.connectors.{HdxTableCatalog, Types}
@@ -43,7 +47,7 @@ final class HdxTrinoConnectorMetadata(val catalog: HdxTableCatalog) extends Conn
     val hdxTable = catalog.loadTable(List(handle.db, handle.table))
 
     hdxTable.schema.fields.map { sf =>
-      sf.name -> HdxColumnHandle(sf.name)
+      sf.name -> new HdxColumnHandle(sf.name)
     }.toMap[String, ColumnHandle].asJava
   }
 
@@ -71,6 +75,8 @@ final class HdxTrinoConnectorMetadata(val catalog: HdxTableCatalog) extends Conn
     val tbl = handle.asInstanceOf[HdxTableHandle]
 
     val hdxTable = catalog.loadTable(List(tbl.db, tbl.table))
+
+    // constraint.summary.domains is a Map(HdxColumnHandle(timestamp) -> SortedRangeSet(type=timestamp(3), sortedRanges=LongArrayBlock(positionCount=2))
 
     super.applyFilter(session, handle, constraint)
   }

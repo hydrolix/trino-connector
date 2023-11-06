@@ -43,4 +43,22 @@ object TrinoTypes {
         sys.error(s"Can't translate core type $other to Trino")
     }
   }
+
+  def trinoToCore(ttyp: ttype.Type): coretypes.ValueType = {
+    ttyp match {
+      case ttype.BooleanType.BOOLEAN => coretypes.BooleanType
+      case ttype.VarcharType.VARCHAR => coretypes.StringType
+      case ttype.TinyintType.TINYINT => coretypes.Int8Type
+      case ttype.SmallintType.SMALLINT => coretypes.Int16Type
+      case ttype.IntegerType.INTEGER => coretypes.Int32Type
+      case ttype.BigintType.BIGINT => coretypes.Int64Type
+      case ttype.TimestampType.TIMESTAMP_SECONDS => coretypes.TimestampType.Seconds
+      case ttype.TimestampType.TIMESTAMP_MILLIS => coretypes.TimestampType.Millis
+      case ttype.TimestampType.TIMESTAMP_MICROS => coretypes.TimestampType.Micros
+      case at: ttype.ArrayType =>
+        coretypes.ArrayType(trinoToCore(at.getElementType), true)
+      case mt: ttype.MapType =>
+        coretypes.MapType(trinoToCore(mt.getKeyType), trinoToCore(mt.getValueType), true)
+    }
+  }
 }

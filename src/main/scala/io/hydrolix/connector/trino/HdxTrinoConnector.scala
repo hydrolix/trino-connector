@@ -57,12 +57,6 @@ final class HdxTrinoConnector(val info: HdxConnectionInfo, val catalog: HdxTable
   override def getPageSourceProvider: ConnectorPageSourceProvider = new HdxTrinoPageSourceProvider(info, catalog)
 }
 
-case class HdxColumnHandle(
-  @JsonProperty @BeanProperty var name: String
-) extends ColumnHandle {
-  def this() = this(null)
-}
-
 case class HdxTrinoConnectorSession(info: HdxConnectionInfo) extends ConnectorSession {
   override val getQueryId = UUID.randomUUID().toString
   override val getStart = Instant.now()

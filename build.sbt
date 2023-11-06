@@ -27,6 +27,7 @@ ThisBuild / assemblyShadeRules := Seq(
 libraryDependencies := Seq(
   "io.hydrolix" %% "hydrolix-connectors-core" % "0.3.2-SNAPSHOT",
   "io.trino" % "trino-spi" % "430" % Provided,
+  "io.trino" % "trino-main" % "430" % Provided,
   "jakarta.annotation" % "jakarta.annotation-api" % "2.1.1",
   "io.airlift" % "configuration" % "237",
   "io.airlift" % "bootstrap" % "237",

@@ -9,17 +9,17 @@ import io.trino.spi.`type`.Type
 import io.trino.spi.connector._
 import org.slf4j.LoggerFactory
 
+import io.hydrolix.connector.trino.HdxTrinoSplitManager.TrinoSplitOps
 import io.hydrolix.connectors.expr.{ArrayLiteral, MapLiteral, StructLiteral}
 import io.hydrolix.connectors.partitionreader.{CoreRowAdapter, RowPartitionReader}
 import io.hydrolix.connectors.types._
-import io.hydrolix.connectors.{HdxApiSession, HdxConnectionInfo, HdxPartitionScanPlan, HdxTableCatalog, microsToInstant}
+import io.hydrolix.connectors.{HdxApiSession, HdxConnectionInfo, HdxPushdown, HdxTableCatalog, microsToInstant}
 
 class HdxTrinoPageSourceProvider(info: HdxConnectionInfo,
                               catalog: HdxTableCatalog)
   extends ConnectorPageSourceProvider
 {
   private val logger = LoggerFactory.getLogger(getClass)
-  private val apiSession = new HdxApiSession(info)
   private val emptyRow = StructLiteral(Map(), StructType())
 
   override def createPageSource(transaction: ConnectorTransactionHandle,
@@ -34,42 +34,30 @@ class HdxTrinoPageSourceProvider(info: HdxConnectionInfo,
     val hsplit = split.asInstanceOf[HdxTrinoSplit]
     val hdxTable = catalog.loadTable(List(handle.db, handle.table))
 
-    val (storageId, storage) = hsplit.part.storageId.flatMap(id => hdxTable.storages.get(id).map(id -> _)).getOrElse {
-      val storages = apiSession.storages()
-      val fromApi = storages.find(_.settings.isDefault) match {
-        case Some(dflt) =>
-          logger.info(s"Couldn't identify Storage for ${handle.db}.${handle.table}, partition ${hsplit.part.partition} -- using default from API")
-          dflt
-        case None =>
-          logger.warn(s"Couldn't identify Storage for ${handle.db}.${handle.table}, partition ${hsplit.part.partition} -- using first listed in API")
-          storages.head
-      }
-      (fromApi.uuid, fromApi.settings)
-    }
-
     val schema = columns.asScala.map {
-      case HdxColumnHandle(name) =>
-        hdxTable.schema.byName.getOrElse(name, sys.error(s"No column `$name` listed in ${handle.db}.${handle.table} schema"))
+      case h: HdxColumnHandle =>
+        hdxTable.schema.byName.getOrElse(h.name, sys.error(s"No column `${h.name}` listed in ${handle.db}.${handle.table} schema"))
     }
 
     val cols = StructType(schema.toList: _*)
 
-    val scan = HdxPartitionScanPlan(
-      handle.db,
-      handle.table,
-      storageId,
-      hsplit.part.partition,
-      cols,
-      Nil, // TODO!
-      hdxTable.hdxCols.filter {
-        case (name, _) => cols.byName.contains(name)
-      })
+    HdxPushdown.doPlan(hdxTable, info.partitionPrefix, cols, Nil, hdxTable.hdxCols, hsplit.toHdxPartition, -1) match {
+      case Some(scan) =>
+        val trinoTypes = cols.fields.map(field => TrinoTypes.coreToTrino(field.`type`))
 
-    val reader = new RowPartitionReader[StructLiteral](info, storage, hdxTable.primaryKeyField, scan, CoreRowAdapter, emptyRow)
+        val reader = new RowPartitionReader[StructLiteral](
+          info,
+          hdxTable.storages.getOrElse(scan.storageId, sys.error(s"No storage #${scan.storageId}")),
+          hdxTable.primaryKeyField,
+          scan,
+          CoreRowAdapter,
+          emptyRow
+        )
 
-    val trinoTypes = cols.fields.map(field => TrinoTypes.coreToTrino(field.`type`))
-
-    new RecordPageSource(trinoTypes.asJava, new HdxTrinoRecordCursor(reader))
+        new RecordPageSource(trinoTypes.asJava, new HdxTrinoRecordCursor(reader))
+      case None =>
+        new EmptyPageSource()
+    }
   }
 }
 
@@ -131,8 +119,12 @@ final class HdxTrinoRecordCursor(reader: RowPartitionReader[StructLiteral]) exte
     schema.fields(field).`type` match {
       case TimestampType(_) => microsToInstant(row.getLong(field))
       case DecimalType(p, s) => row.getDecimal(field, p, s)
-      case ArrayType(_, _) => row.values(field).asInstanceOf[ArrayLiteral[_]].value
-      case MapType(_, _, _) => row.values(field).asInstanceOf[MapLiteral[_,_]].value
+      case ArrayType(elt, _) =>
+        val values = row.values(field).asInstanceOf[ArrayLiteral[_]].value
+        ???
+      case MapType(_, _, _) =>
+        val values = row.values(field).asInstanceOf[MapLiteral[_,_]].value
+        ???
     }
   }
 
