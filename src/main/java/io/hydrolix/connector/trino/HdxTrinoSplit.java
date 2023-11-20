@@ -11,20 +11,23 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Trino ConnectorSplit implementation of Hydrolix partition metadata
+ */
 public record HdxTrinoSplit(
   String partition,
   @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "UTC", lenient = OptBoolean.TRUE)
   Instant minTimestamp,
   @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "UTC", lenient = OptBoolean.TRUE)
   Instant maxTimestamp,
-  Long manifestSize,
-  Long dataSize,
-  Long indexSize,
-  Long rows,
-  Long memSize,
+  long manifestSize,
+  long dataSize,
+  long indexSize,
+  long rows,
+  long memSize,
   String rootPath,
   String shardKey,
-  Boolean active,
+  boolean active,
   Optional<UUID> storageId
 ) implements ConnectorSplit {
     @Override

@@ -3,62 +3,86 @@ package io.hydrolix.connector.trino
 import java.util.Optional
 import scala.jdk.CollectionConverters._
 
-import io.trino.spi.{`type` => ttype}
+import io.trino.spi.{`type` => ttypes}
+import org.slf4j.LoggerFactory
+
 import io.hydrolix.connectors.{types => coretypes}
 
 object TrinoTypes {
-  def coreToTrino(typ: coretypes.ValueType): ttype.Type = {
+  private val logger = LoggerFactory.getLogger(getClass)
+
+  def coreToTrino(typ: coretypes.ValueType): Option[ttypes.Type] = {
     typ match {
-      case coretypes.Int8Type          => ttype.TinyintType.TINYINT
-      case coretypes.UInt8Type         => ttype.SmallintType.SMALLINT
-      case coretypes.Int16Type         => ttype.SmallintType.SMALLINT
-      case coretypes.UInt16Type        => ttype.IntegerType.INTEGER
-      case coretypes.Int32Type         => ttype.IntegerType.INTEGER
-      case coretypes.UInt32Type        => ttype.BigintType.BIGINT
-      case coretypes.Int64Type         => ttype.BigintType.BIGINT
-      case coretypes.UInt64Type        => ttype.DecimalType.createDecimalType(20, 0)
-      case coretypes.Float32Type       => ttype.RealType.REAL
-      case coretypes.Float64Type       => ttype.DoubleType.DOUBLE
-      case coretypes.StringType        => ttype.VarcharType.VARCHAR
-      case coretypes.BooleanType       => ttype.BooleanType.BOOLEAN
-      case coretypes.TimestampType(p)  => ttype.TimestampType.createTimestampType(p)
-      case coretypes.DecimalType(p, s) => ttype.DecimalType.createDecimalType(p, s)
+      case coretypes.Int8Type          => Some(ttypes.TinyintType.TINYINT)
+      case coretypes.UInt8Type         => Some(ttypes.SmallintType.SMALLINT)
+      case coretypes.Int16Type         => Some(ttypes.SmallintType.SMALLINT)
+      case coretypes.UInt16Type        => Some(ttypes.IntegerType.INTEGER)
+      case coretypes.Int32Type         => Some(ttypes.IntegerType.INTEGER)
+      case coretypes.UInt32Type        => Some(ttypes.BigintType.BIGINT)
+      case coretypes.Int64Type         => Some(ttypes.BigintType.BIGINT)
+      case coretypes.UInt64Type        => Some(ttypes.DecimalType.createDecimalType(20, 0))
+      case coretypes.Float32Type       => Some(ttypes.RealType.REAL)
+      case coretypes.Float64Type       => Some(ttypes.DoubleType.DOUBLE)
+      case coretypes.StringType        => Some(ttypes.VarcharType.VARCHAR)
+      case coretypes.BooleanType       => Some(ttypes.BooleanType.BOOLEAN)
+      case coretypes.TimestampType(p)  => Some(ttypes.TimestampType.createTimestampType(p))
+      case coretypes.DecimalType(p, s) => Some(ttypes.DecimalType.createDecimalType(p, s))
       case coretypes.ArrayType(elt, _) =>
-        val telt = coreToTrino(elt)
-        new ttype.ArrayType(telt)
+        coreToTrino(elt).map(new ttypes.ArrayType(_))
       case coretypes.MapType(kt, vt, _) =>
-        val tkt = coreToTrino(kt)
-        val tvt = coreToTrino(vt)
-        new ttype.MapType(tkt, tvt, new ttype.TypeOperators()) // TODO wtf is this?
+        for {
+          kt <- coreToTrino(kt)
+          vt <- coreToTrino(vt)
+        } yield {
+          new ttypes.MapType(kt, vt, new ttypes.TypeOperators()) // TODO wtf is this?
+        }
       case coretypes.StructType(fields @ _*) =>
-        val tfields = fields.map { fld =>
-          new ttype.RowType.Field(
-            Optional.of(fld.name),
-            coreToTrino(fld.`type`)
-          )
+        val trinoFields = fields.flatMap { fld =>
+          coreToTrino(fld.`type`).map { typ =>
+            new ttypes.RowType.Field(
+              Optional.of(fld.name),
+              typ
+            )
+          }
         }
 
-        ttype.RowType.from(tfields.asJava)
+        if (trinoFields.size != fields.size) {
+          None
+        } else {
+          Some(ttypes.RowType.from(trinoFields.asJava))
+        }
+
       case other =>
-        sys.error(s"Can't translate core type $other to Trino")
+        logger.warn(s"Can't translate core type $other to Trino")
+        None
     }
   }
 
-  def trinoToCore(ttyp: ttype.Type): coretypes.ValueType = {
-    ttyp match {
-      case ttype.BooleanType.BOOLEAN => coretypes.BooleanType
-      case ttype.VarcharType.VARCHAR => coretypes.StringType
-      case ttype.TinyintType.TINYINT => coretypes.Int8Type
-      case ttype.SmallintType.SMALLINT => coretypes.Int16Type
-      case ttype.IntegerType.INTEGER => coretypes.Int32Type
-      case ttype.BigintType.BIGINT => coretypes.Int64Type
-      case ttype.TimestampType.TIMESTAMP_SECONDS => coretypes.TimestampType.Seconds
-      case ttype.TimestampType.TIMESTAMP_MILLIS => coretypes.TimestampType.Millis
-      case ttype.TimestampType.TIMESTAMP_MICROS => coretypes.TimestampType.Micros
-      case at: ttype.ArrayType =>
-        coretypes.ArrayType(trinoToCore(at.getElementType), true)
-      case mt: ttype.MapType =>
-        coretypes.MapType(trinoToCore(mt.getKeyType), trinoToCore(mt.getValueType), true)
+  def trinoToCore(trinoType: ttypes.Type): Option[coretypes.ValueType] = {
+    trinoType match {
+      case ttypes.BooleanType.BOOLEAN             => Some(coretypes.BooleanType)
+      case ttypes.VarcharType.VARCHAR             => Some(coretypes.StringType)
+      case ttypes.TinyintType.TINYINT             => Some(coretypes.Int8Type)
+      case ttypes.SmallintType.SMALLINT           => Some(coretypes.Int16Type)
+      case ttypes.IntegerType.INTEGER             => Some(coretypes.Int32Type)
+      case ttypes.BigintType.BIGINT               => Some(coretypes.Int64Type)
+      case ttypes.TimestampType.TIMESTAMP_SECONDS => Some(coretypes.TimestampType.Seconds)
+      case ttypes.TimestampType.TIMESTAMP_MILLIS  => Some(coretypes.TimestampType.Millis)
+      case ttypes.TimestampType.TIMESTAMP_MICROS  => Some(coretypes.TimestampType.Micros)
+      case at: ttypes.ArrayType =>
+        trinoToCore(at.getElementType).map { typ =>
+          coretypes.ArrayType(typ, true)
+        }
+      case mt: ttypes.MapType =>
+        for {
+          kt <- trinoToCore(mt.getKeyType)
+          vt <- trinoToCore(mt.getValueType)
+        } yield {
+          coretypes.MapType(kt, vt, true)
+        }
+      case other =>
+        logger.warn(s"Can't translate Trino type $other to core")
+        None
     }
   }
 }

@@ -1,17 +1,19 @@
 package io.hydrolix.connector.trino
 
-import java.{lang => jl}
-import scala.jdk.CollectionConverters.CollectionHasAsScala
+import java.{lang => jl, util => ju}
+import scala.annotation.unused
+import scala.jdk.CollectionConverters._
 
-import io.trino.spi.block.LongArrayBlock
+import io.trino.spi.expression._
 import io.trino.spi.{`type` => ttypes}
-import io.trino.spi.expression.{Call, ConnectorExpression, Constant, FieldDereference, FunctionName, StandardFunctions}
-import io.trino.spi.predicate.{Domain, SortedRangeSet}
+import org.slf4j.LoggerFactory
 
-import io.hydrolix.connectors.expr.{And, BooleanLiteral, Equal, Expr, Float32Literal, Float64Literal, GreaterEqual, GreaterThan, Int16Literal, Int32Literal, Int64Literal, Int8Literal, LessEqual, LessThan, Not, NotEqual, Or, StringLiteral, TimestampLiteral}
-import io.hydrolix.connectors.{microsToInstant, types => coretypes}
+import io.hydrolix.connectors.expr._
+import io.hydrolix.connectors.{instantToMicros, microsToInstant, types => coretypes}
 
 object TrinoExpressions {
+  @unused private val logger = LoggerFactory.getLogger(getClass)
+
   def trinoToCore(expr: ConnectorExpression): Expr[_] = {
     if (expr.getType == ttypes.BooleanType.BOOLEAN) {
       TrinoPredicates.trinoToCore(expr)
@@ -28,7 +30,7 @@ object TrinoExpressions {
         case TLit(ttypes.DoubleType.DOUBLE,     d: jl.Double)        => Float64Literal(d.doubleValue())
         case TLit(st: ttypes.TimestampType, l: jl.Long) if st.isShort =>
           TimestampLiteral(microsToInstant(l.longValue()))
-        // TODO long timestamps?
+        // TODO "long" timestamps?
         // TODO decimals
         // TODO arrays
         // TODO maps
@@ -37,46 +39,54 @@ object TrinoExpressions {
     }
   }
 
-  def domainToCore(domain: Domain): Expr[_] = {
-    val coretype = TrinoTypes.trinoToCore(domain.getType)
+  private val op2Trino = Map(
+    ComparisonOp.LT -> StandardFunctions.LESS_THAN_OPERATOR_FUNCTION_NAME,
+    ComparisonOp.LE -> StandardFunctions.LESS_THAN_OR_EQUAL_OPERATOR_FUNCTION_NAME,
+    ComparisonOp.EQ -> StandardFunctions.EQUAL_OPERATOR_FUNCTION_NAME,
+    ComparisonOp.NE -> StandardFunctions.NOT_EQUAL_OPERATOR_FUNCTION_NAME,
+    ComparisonOp.GE -> StandardFunctions.GREATER_THAN_OR_EQUAL_OPERATOR_FUNCTION_NAME,
+    ComparisonOp.GT -> StandardFunctions.GREATER_THAN_OPERATOR_FUNCTION_NAME,
+  )
 
-    domain.getValues match {
-      case srs: SortedRangeSet if srs.getSortedRanges.isInstanceOf[LongArrayBlock] =>
-    }
-  }
-}
-
-object TrinoPredicates {
-  def trinoToCore(expr: ConnectorExpression): Expr[Boolean] = {
+  def coreToTrino(schema: coretypes.StructType, scan: Call, expr: Expr[Any]): ConnectorExpression = {
     expr match {
-      case TPred(StandardFunctions.AND_FUNCTION_NAME, args) =>
-        And(args.map(trinoToCore))
-      case TPred(StandardFunctions.OR_FUNCTION_NAME, args) =>
-        Or(args.map(trinoToCore))
-      case TPred(StandardFunctions.NOT_FUNCTION_NAME, List(arg)) =>
-        Not(trinoToCore(arg))
-      case TPred(StandardFunctions.LESS_THAN_OPERATOR_FUNCTION_NAME, List(l, r)) =>
-        LessThan(TrinoExpressions.trinoToCore(l), TrinoExpressions.trinoToCore(r))
-      case TPred(StandardFunctions.LESS_THAN_OR_EQUAL_OPERATOR_FUNCTION_NAME, List(l, r)) =>
-        LessEqual(TrinoExpressions.trinoToCore(l), TrinoExpressions.trinoToCore(r))
-      case TPred(StandardFunctions.GREATER_THAN_OPERATOR_FUNCTION_NAME, List(l, r)) =>
-        GreaterThan(TrinoExpressions.trinoToCore(l), TrinoExpressions.trinoToCore(r))
-      case TPred(StandardFunctions.GREATER_THAN_OR_EQUAL_OPERATOR_FUNCTION_NAME, List(l, r)) =>
-        GreaterEqual(TrinoExpressions.trinoToCore(l), TrinoExpressions.trinoToCore(r))
-      case TPred(StandardFunctions.EQUAL_OPERATOR_FUNCTION_NAME, List(l, r)) =>
-        Equal(TrinoExpressions.trinoToCore(l), TrinoExpressions.trinoToCore(r))
-      case TPred(StandardFunctions.NOT_EQUAL_OPERATOR_FUNCTION_NAME, List(l, r)) =>
-        NotEqual(TrinoExpressions.trinoToCore(l), TrinoExpressions.trinoToCore(r))
-    }
-  }
-}
+      case GetField(name, typ) =>
+        new FieldDereference(TrinoTypes.coreToTrino(typ).getOrElse(sys.error(s"Can't translate $name: $typ to Trino type")), scan, schema.fields.indexWhere(_.name == name))
 
-object TCall {
-  def unapply(expr: ConnectorExpression): Option[(ttypes.Type, String, List[ConnectorExpression])] = {
-    expr match {
-      case call: Call if call.getFunctionName.getCatalogSchema.isEmpty => 
-        Some((call.getType, call.getFunctionName.getName, call.getArguments.asScala.toList))
-      case _ => None
+      case Comparison(left, op, right) =>
+        new Call(
+          ttypes.BooleanType.BOOLEAN,
+          op2Trino(op),
+          ju.Arrays.asList(
+            coreToTrino(schema, scan, left),
+            coreToTrino(schema, scan, right)
+          )
+        )
+
+      case And(kids) =>
+        new Call(
+          ttypes.BooleanType.BOOLEAN,
+          StandardFunctions.AND_FUNCTION_NAME,
+          kids.map(coreToTrino(schema, scan, _)).asJava
+        )
+      case Or(kids) =>
+        new Call(
+          ttypes.BooleanType.BOOLEAN,
+          StandardFunctions.OR_FUNCTION_NAME,
+          kids.map(coreToTrino(schema, scan, _)).asJava
+        )
+      case Not(kid) =>
+        new Call(
+          ttypes.BooleanType.BOOLEAN,
+          StandardFunctions.NOT_FUNCTION_NAME,
+          ju.Arrays.asList(coreToTrino(schema, scan, kid))
+        )
+
+      case StringLiteral(s)       => new Constant(s, ttypes.VarcharType.VARCHAR)
+      case BooleanLiteral(b)      => new Constant(b, ttypes.BooleanType.BOOLEAN)
+      case Int8Literal(b)         => new Constant(b, ttypes.TinyintType.TINYINT)
+      case UInt8Literal(s)        => new Constant(s, ttypes.SmallintType.SMALLINT)
+      case TimestampLiteral(inst) => new Constant(instantToMicros(inst), ttypes.TimestampType.TIMESTAMP_MICROS)
     }
   }
 }

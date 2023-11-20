@@ -2,12 +2,11 @@ package io.hydrolix.connector.trino
 
 import java.time.Instant
 import java.util.{Locale, Optional, UUID}
-import java.{lang => jl, util => ju}
-import scala.beans.BeanProperty
+import java.{util => ju}
+import scala.annotation.unused
 import scala.jdk.CollectionConverters._
 
-import com.fasterxml.jackson.annotation.{JsonCreator, JsonProperty}
-import io.trino.spi.`type`.{TimeZoneKey, Type}
+import io.trino.spi.`type`.TimeZoneKey
 import io.trino.spi.connector._
 import io.trino.spi.security.ConnectorIdentity
 import io.trino.spi.transaction.IsolationLevel
@@ -18,8 +17,6 @@ import io.hydrolix.connectors.{HdxConnectionInfo, HdxTableCatalog}
 
 final class HdxTrinoPlugin extends Plugin {
   override val getConnectorFactories: ju.List[ConnectorFactory] = ju.Arrays.asList(HdxTrinoConnectorFactory)
-
-  override def getTypes: jl.Iterable[Type] = super.getTypes
 }
 
 object HdxTrinoConnectorFactory extends ConnectorFactory {
@@ -39,10 +36,10 @@ object HdxTrinoConnectorFactory extends ConnectorFactory {
 }
 
 final class HdxTrinoConnector(val info: HdxConnectionInfo, val catalog: HdxTableCatalog) extends Connector {
-  private val logger = LoggerFactory.getLogger(getClass)
+  @unused private val logger = LoggerFactory.getLogger(getClass)
 
   override def getMetadata(session: ConnectorSession, transactionHandle: ConnectorTransactionHandle): ConnectorMetadata = {
-    new HdxTrinoConnectorMetadata(catalog)
+    new HdxTrinoConnectorMetadata(info, catalog)
   }
 
   override def getSplitManager: ConnectorSplitManager = new HdxTrinoSplitManager(info, catalog)

@@ -1,19 +1,23 @@
 package io.hydrolix.connector.trino
 
-import java.time.Instant
+import java.util.Optional
 import java.{util => ju}
+import scala.annotation.unused
 import scala.jdk.CollectionConverters._
 import scala.jdk.OptionConverters._
 
-import io.trino.spi.`type`.TimestampType
-import io.trino.spi.block.LongArrayBlock
+import io.trino.spi.`type`._
+import io.trino.spi.block.Block
 import io.trino.spi.connector._
-import io.trino.spi.predicate.{SortedRangeSet, TupleDomain}
+import io.trino.spi.expression.{ConnectorExpression, Variable}
+import io.trino.spi.function.FunctionMetadata
 import org.slf4j.LoggerFactory
 
-import io.hydrolix.connectors.{HdxTableCatalog, Types}
+import io.hydrolix.connector.trino.HdxTrinoSplitManager.HdxDbPartitionOps
+import io.hydrolix.connectors.expr._
+import io.hydrolix.connectors.{HdxConnectionInfo, HdxJdbcSession, HdxTableCatalog, Types, types => coretypes}
 
-final class HdxTrinoConnectorMetadata(val catalog: HdxTableCatalog) extends ConnectorMetadata {
+final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: HdxTableCatalog) extends ConnectorMetadata {
   private val logger = LoggerFactory.getLogger(getClass)
 
   override def listSchemaNames(session: ConnectorSession): ju.List[String] = {
@@ -26,8 +30,18 @@ final class HdxTrinoConnectorMetadata(val catalog: HdxTableCatalog) extends Conn
     }.asJava
   }
 
-  override def getTableHandle(session: ConnectorSession, tableName: SchemaTableName): ConnectorTableHandle = {
-    new HdxTableHandle(tableName.getSchemaName, tableName.getTableName)
+  override def getTableHandle(session: ConnectorSession,
+                            tableName: SchemaTableName,
+                         startVersion: ju.Optional[ConnectorTableVersion],
+                           endVersion: ju.Optional[ConnectorTableVersion])
+                                     : ConnectorTableHandle =
+  {
+    new HdxTableHandle(
+      tableName.getSchemaName,
+      tableName.getTableName,
+      ju.Collections.emptyList(), // Don't know which partitions we need to read yet
+      ju.Collections.emptyList(), // Don't know which columns we need to read yet
+    )
   }
 
   override def getTableMetadata(session: ConnectorSession, table: ConnectorTableHandle): ConnectorTableMetadata = {
@@ -35,9 +49,9 @@ final class HdxTrinoConnectorMetadata(val catalog: HdxTableCatalog) extends Conn
     val hdxTable = catalog.loadTable(List(handle.db, handle.table))
     new ConnectorTableMetadata(
       new SchemaTableName(handle.db, handle.table),
-      hdxTable.hdxCols.map { case (name, hcol) =>
-        val vt = Types.hdxToValueType(hcol.hdxType)
-        new ColumnMetadata(name, TrinoTypes.coreToTrino(vt))
+      hdxTable.hdxCols.map { case (name, hdxCol) =>
+        val vt = Types.hdxToValueType(hdxCol.hdxType)
+        new ColumnMetadata(name, TrinoTypes.coreToTrino(vt).getOrElse(sys.error(s"Can't translate $name: ${hdxCol.hdxType} to Trino type")))
       }.toList.asJava
     )
   }
@@ -47,24 +61,27 @@ final class HdxTrinoConnectorMetadata(val catalog: HdxTableCatalog) extends Conn
     val hdxTable = catalog.loadTable(List(handle.db, handle.table))
 
     hdxTable.schema.fields.map { sf =>
-      sf.name -> new HdxColumnHandle(sf.name)
+      sf.name -> new HdxColumnHandle(sf.name, Optional.empty())
     }.toMap[String, ColumnHandle].asJava
   }
-
 
   override def getColumnMetadata(session: ConnectorSession,
                              tableHandle: ConnectorTableHandle,
                             columnHandle: ColumnHandle)
                                         : ColumnMetadata =
   {
-    val chandle = columnHandle.asInstanceOf[HdxColumnHandle]
-    val thandle = tableHandle.asInstanceOf[HdxTableHandle]
-    val hdxTable = catalog.loadTable(List(thandle.db, thandle.table))
+    val col = columnHandle.asInstanceOf[HdxColumnHandle]
+    val tbl = tableHandle.asInstanceOf[HdxTableHandle]
+    val hdxTable = catalog.loadTable(List(tbl.db, tbl.table))
 
-    new ColumnMetadata(
-      chandle.name,
-      TrinoTypes.coreToTrino(hdxTable.schema.byName(chandle.name).`type`)
-    )
+    val coreType = hdxTable.schema.byName(col.name).`type`
+    val trinoType = TrinoTypes.coreToTrino(coreType).getOrElse(sys.error(s"Can't translate ${col.name}: $coreType to Trino type"))
+
+    new ColumnMetadata(col.name, trinoType)
+  }
+
+  override def listFunctions(session: ConnectorSession, schemaName: String): ju.Collection[FunctionMetadata] = {
+    ju.Collections.emptyList()
   }
 
   override def applyFilter(session: ConnectorSession,
@@ -74,10 +91,104 @@ final class HdxTrinoConnectorMetadata(val catalog: HdxTableCatalog) extends Conn
   {
     val tbl = handle.asInstanceOf[HdxTableHandle]
 
+    if (!tbl.splits.isEmpty) {
+      // Nothing further to do here
+      return ju.Optional.empty()
+    }
+
     val hdxTable = catalog.loadTable(List(tbl.db, tbl.table))
 
-    // constraint.summary.domains is a Map(HdxColumnHandle(timestamp) -> SortedRangeSet(type=timestamp(3), sortedRanges=LongArrayBlock(positionCount=2))
+    val pk = tbl.columns.asScala
+      .find(_.name == hdxTable.primaryKeyField)
+      .getOrElse(sys.error(s"Couldn't find primary key field ${hdxTable.primaryKeyField} in Trino schema"))
 
-    super.applyFilter(session, handle, constraint)
+    val sk = hdxTable.shardKeyField.map { skf =>
+      tbl.columns.asScala
+        .find(_.name == skf)
+        .getOrElse(sys.error(s"Couldn't find shard key field $skf in Trino schema"))
+    }
+
+    val pushed = constraint.getSummary.getDomains.toScala.map(_.asScala).getOrElse(Map()).flatMap {
+      case (`pk`, dom) if dom.getType.isInstanceOf[TimestampType] =>
+        // Matching on primary timestamp field
+        TrinoPredicates.domainToCore(pk.name, dom)
+      case (ch: HdxColumnHandle, dom) if sk.contains(ch) && dom.getType == VarcharType.VARCHAR =>
+        // Matching on shard key field
+        TrinoPredicates.domainToCore(ch.name, dom)
+      case other =>
+        logger.info(s"Predicate not pushable; will eval after scan: $other")
+        None
+    }
+
+    // TODO this is duplicated from connectors-core
+    val minTimestamp = pushed.collectFirst {
+      case GreaterEqual(GetField(hdxTable.primaryKeyField, coretypes.TimestampType(_)), TimestampLiteral(inst)) => inst
+      case GreaterThan(GetField(hdxTable.primaryKeyField, coretypes.TimestampType(_)), TimestampLiteral(inst)) => inst.plusSeconds(1)
+    }
+
+    val maxTimestamp = pushed.collectFirst {
+      case LessEqual(GetField(hdxTable.primaryKeyField, coretypes.TimestampType(_)), TimestampLiteral(inst)) => inst
+      case LessThan(GetField(hdxTable.primaryKeyField, coretypes.TimestampType(_)), TimestampLiteral(inst)) => inst.minusSeconds(1)
+    }
+
+    if (minTimestamp.isEmpty && maxTimestamp.isEmpty) {
+      logger.warn("No predicates useful for partition pruning, this will be slow :(")
+    }
+
+    val parts = HdxJdbcSession(info).collectPartitions(tbl.db, tbl.table, minTimestamp, maxTimestamp)
+
+    // All the partitions that need to be read, stuffed into the TableHandle
+    ju.Optional.of(
+      new ConstraintApplicationResult(
+        tbl.withSplits(parts.map(_.toSplit).asJava),
+        constraint.getSummary, // Nothing can be completely pushed -- even shard key can have hash collisions
+        false // TODO maybe not?
+      ))
+  }
+
+  override def applyProjection(session: ConnectorSession,
+                                handle: ConnectorTableHandle,
+                           projections: ju.List[ConnectorExpression],
+                           assignments: ju.Map[String, ColumnHandle])
+                                      : Optional[ProjectionApplicationResult[ConnectorTableHandle]] =
+  {
+    // projections are Variable expressions with name & type
+    // assignments relate Variable names to ColumnHandles
+
+    val tbl = handle.asInstanceOf[HdxTableHandle]
+
+    val assignmentsOut = projections.asScala.flatMap {
+      case v: Variable =>
+        val name = v.getName
+        val trinoType = v.getType
+
+        Some(new Assignment(name, new HdxColumnHandle(name, Optional.of(trinoType)), trinoType))
+      case other =>
+        logger.warn(s"Couldn't make column assignment from $other; skipping")
+        None
+    }.toList
+
+    val colsOut = assignmentsOut.map(_.getColumn.asInstanceOf[HdxColumnHandle])
+
+    Optional.of(new ProjectionApplicationResult(
+      tbl.withColumns(colsOut.asJava),
+      projections,
+      assignmentsOut.asJava,
+      false // TODO maybe not?
+    ))
+  }
+
+  @unused
+  private def makeBlock(ss: List[String]): Block = {
+    // ugh
+    val arrayBuilder = new ArrayType(VarcharType.VARCHAR).createBlockBuilder(null, 0)
+
+    arrayBuilder.buildEntry { elementBuilder =>
+      for (s <- ss) {
+        VarcharType.VARCHAR.writeString(elementBuilder, s)
+      }
+    }
+
+    arrayBuilder.build()
   }
 }

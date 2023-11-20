@@ -43,7 +43,9 @@ class HdxTrinoPageSourceProvider(info: HdxConnectionInfo,
 
     HdxPushdown.doPlan(hdxTable, info.partitionPrefix, cols, Nil, hdxTable.hdxCols, hsplit.toHdxPartition, -1) match {
       case Some(scan) =>
-        val trinoTypes = cols.fields.map(field => TrinoTypes.coreToTrino(field.`type`))
+        val trinoTypes = cols.fields.map { field =>
+          TrinoTypes.coreToTrino(field.`type`).getOrElse(sys.error(s"Can't translate ${field.name}: ${field.`type`} to Trino type"))
+        }
 
         val reader = new RowPartitionReader[StructLiteral](
           info,
@@ -71,7 +73,10 @@ final class HdxTrinoRecordCursor(reader: RowPartitionReader[StructLiteral]) exte
 
   override def getReadTimeNanos: Long = Duration.between(startTime, Instant.now()).toNanos
 
-  override def getType(field: Int): Type = TrinoTypes.coreToTrino(schema.fields(field).`type`)
+  override def getType(field: Int): Type = {
+    val fld = schema.fields(field)
+    TrinoTypes.coreToTrino(fld.`type`).getOrElse(sys.error(s"Can't translate ${fld.name}: ${fld.`type`} to Trino type"))
+  }
 
   override def advanceNextPosition(): Boolean = {
     if (reader.next()) {
