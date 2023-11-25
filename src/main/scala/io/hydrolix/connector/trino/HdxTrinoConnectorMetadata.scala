@@ -2,12 +2,10 @@ package io.hydrolix.connector.trino
 
 import java.util.Optional
 import java.{util => ju}
-import scala.annotation.unused
 import scala.jdk.CollectionConverters._
 import scala.jdk.OptionConverters._
 
 import io.trino.spi.`type`._
-import io.trino.spi.block.Block
 import io.trino.spi.connector._
 import io.trino.spi.expression.{ConnectorExpression, Variable}
 import io.trino.spi.function.FunctionMetadata
@@ -176,19 +174,5 @@ final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: 
       assignmentsOut.asJava,
       false // TODO maybe not?
     ))
-  }
-
-  @unused
-  private def makeBlock(ss: List[String]): Block = {
-    // ugh
-    val arrayBuilder = new ArrayType(VarcharType.VARCHAR).createBlockBuilder(null, 0)
-
-    arrayBuilder.buildEntry { elementBuilder =>
-      for (s <- ss) {
-        VarcharType.VARCHAR.writeString(elementBuilder, s)
-      }
-    }
-
-    arrayBuilder.build()
   }
 }

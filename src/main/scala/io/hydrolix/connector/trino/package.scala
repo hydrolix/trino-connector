@@ -2,6 +2,9 @@ package io.hydrolix.connector
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 
+import io.trino.spi.`type`.{ArrayType, DecimalType, TypeUtils}
+import io.trino.spi.block.Block
+
 package object trino {
   def serialize(obj: Serializable): Array[Byte] = {
     val baos = new ByteArrayOutputStream()
@@ -16,10 +19,19 @@ package object trino {
     ois.readObject().asInstanceOf[T]
   }
 
-  implicit class NullOps[T <: AnyRef](val raw: T) extends AnyVal {
-    def ifNull(msg: String): T = {
-      if (raw == null) sys.error(msg)
-      raw
+  def makeArrayBlock[T](ss: Iterable[T], arrayType: ArrayType): Block = {
+    val arrayBuilder = arrayType.createBlockBuilder(null, 0)
+
+    if (ss.nonEmpty) {
+      for (s <- ss) {
+        arrayBuilder.buildEntry { elementBuilder =>
+          TypeUtils.writeNativeValue(arrayType.getElementType, elementBuilder, s)
+        }
+      }
     }
+
+    arrayBuilder.build()
   }
+
+  val TrinoUInt64Type = DecimalType.createDecimalType(20)
 }

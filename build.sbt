@@ -9,6 +9,7 @@ lazy val root = (project in file("."))
     name := "hydrolix-trino-connector"
   )
 
+//noinspection scala2InSource3
 ThisBuild / assemblyMergeStrategy := {
   case PathList("ch", "qos", "logback", _*)                => MergeStrategy.first
   case PathList(ps @ _*) if ps.last == "module-info.class" => MergeStrategy.discard
@@ -25,7 +26,7 @@ ThisBuild / assemblyShadeRules := Seq(
 */
 
 libraryDependencies := Seq(
-  "io.hydrolix" %% "hydrolix-connectors-core" % "1.0.0-SNAPSHOT",
+  "io.hydrolix" %% "hydrolix-connectors-core" % "1.1.0-SNAPSHOT",
   "io.trino" % "trino-spi" % "430" % Provided,
   "io.trino" % "trino-main" % "430" % Provided,
   "jakarta.annotation" % "jakarta.annotation-api" % "2.1.1",

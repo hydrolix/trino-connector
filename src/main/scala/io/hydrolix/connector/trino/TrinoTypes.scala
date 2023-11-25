@@ -20,7 +20,7 @@ object TrinoTypes {
       case coretypes.Int32Type         => Some(ttypes.IntegerType.INTEGER)
       case coretypes.UInt32Type        => Some(ttypes.BigintType.BIGINT)
       case coretypes.Int64Type         => Some(ttypes.BigintType.BIGINT)
-      case coretypes.UInt64Type        => Some(ttypes.DecimalType.createDecimalType(20, 0))
+      case coretypes.UInt64Type        => Some(TrinoUInt64Type)
       case coretypes.Float32Type       => Some(ttypes.RealType.REAL)
       case coretypes.Float64Type       => Some(ttypes.DoubleType.DOUBLE)
       case coretypes.StringType        => Some(ttypes.VarcharType.VARCHAR)
@@ -36,7 +36,7 @@ object TrinoTypes {
         } yield {
           new ttypes.MapType(kt, vt, new ttypes.TypeOperators()) // TODO wtf is this?
         }
-      case coretypes.StructType(fields @ _*) =>
+      case coretypes.StructType(fields) =>
         val trinoFields = fields.flatMap { fld =>
           coreToTrino(fld.`type`).map { typ =>
             new ttypes.RowType.Field(
