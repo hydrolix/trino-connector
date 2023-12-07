@@ -69,13 +69,18 @@ final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: 
                                         : ColumnMetadata =
   {
     val col = columnHandle.asInstanceOf[HdxColumnHandle]
-    val tbl = tableHandle.asInstanceOf[HdxTableHandle]
-    val hdxTable = catalog.loadTable(List(tbl.db, tbl.table))
 
-    val coreType = hdxTable.schema.byName(col.name).`type`
-    val trinoType = TrinoTypes.coreToTrino(coreType).getOrElse(sys.error(s"Can't translate ${col.name}: $coreType to Trino type"))
+    if (col.trinoType.isPresent) {
+      new ColumnMetadata(col.name, col.trinoType.get())
+    } else {
+      val tbl = tableHandle.asInstanceOf[HdxTableHandle]
+      val hdxTable = catalog.loadTable(List(tbl.db, tbl.table))
 
-    new ColumnMetadata(col.name, trinoType)
+      val coreType = hdxTable.schema.byName(col.name).`type`
+      val trinoType = TrinoTypes.coreToTrino(coreType).getOrElse(sys.error(s"Can't translate ${col.name}: $coreType to Trino type"))
+
+      new ColumnMetadata(col.name, trinoType)
+    }
   }
 
   override def listFunctions(session: ConnectorSession, schemaName: String): ju.Collection[FunctionMetadata] = {

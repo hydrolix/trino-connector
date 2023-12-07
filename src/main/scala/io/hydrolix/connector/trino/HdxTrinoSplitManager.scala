@@ -1,11 +1,13 @@
 package io.hydrolix.connector.trino
 
+import scala.jdk.CollectionConverters._
 import scala.jdk.OptionConverters.{RichOption, RichOptional}
 
 import io.trino.spi.connector._
 import org.slf4j.LoggerFactory
 
-import io.hydrolix.connectors.{HdxConnectionInfo, HdxDbPartition, HdxTableCatalog}
+import io.hydrolix.connector.trino.HdxTrinoSplitManager.HdxDbPartitionOps
+import io.hydrolix.connectors.{HdxConnectionInfo, HdxDbPartition, HdxJdbcSession, HdxTableCatalog}
 
 final class HdxTrinoSplitManager(val info: HdxConnectionInfo, val catalog: HdxTableCatalog) extends ConnectorSplitManager {
   private val logger = LoggerFactory.getLogger(getClass)
@@ -19,7 +21,15 @@ final class HdxTrinoSplitManager(val info: HdxConnectionInfo, val catalog: HdxTa
   {
     val tbl = table.asInstanceOf[HdxTableHandle]
 
-    new FixedSplitSource(tbl.splits)
+    if (!tbl.splits.isEmpty) {
+      // applyFilter has already been here
+      new FixedSplitSource(tbl.splits)
+    } else {
+      // TODO double-check if dynamicFilter or constraint might be non-empty if applyFilter didn't have anything to say?
+      val jdbc = HdxJdbcSession(info)
+      val parts = jdbc.collectPartitions(tbl.db, tbl.table, None, None)
+      new FixedSplitSource(parts.map(_.toSplit).asJava)
+    }
   }
 }
 
