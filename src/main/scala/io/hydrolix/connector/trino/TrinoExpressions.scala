@@ -4,6 +4,7 @@ import java.{lang => jl, util => ju}
 import scala.annotation.unused
 import scala.jdk.CollectionConverters._
 
+import io.trino.spi.`type`.{Int128, LongTimestamp}
 import io.trino.spi.expression._
 import io.trino.spi.{`type` => ttypes}
 import org.slf4j.LoggerFactory
@@ -28,10 +29,11 @@ object TrinoExpressions {
         case TLit(ttypes.BigintType.BIGINT,     l: jl.Long)          => Int64Literal(l.longValue())
         case TLit(ttypes.RealType.REAL,         f: jl.Float)         => Float32Literal(f.floatValue())
         case TLit(ttypes.DoubleType.DOUBLE,     d: jl.Double)        => Float64Literal(d.doubleValue())
-        case TLit(st: ttypes.TimestampType, l: jl.Long) if st.isShort =>
-          TimestampLiteral(microsToInstant(l.longValue()))
-        // TODO "long" timestamps?
-        // TODO decimals
+
+        case TLit(tt: ttypes.TimestampType, l: jl.Long) if tt.isShort => TimestampLiteral(microsToInstant(l.longValue()))
+        case TLit(_: ttypes.TimestampType, lt: LongTimestamp)         => TimestampLiteral(fixed12ToInstant(lt.getEpochMicros, lt.getPicosOfMicro))
+        case TLit(dt: ttypes.DecimalType, l: jl.Long) if dt.isShort   => DecimalLiteral(decodeShortDecimal(dt, l.longValue()))
+        case TLit(dt: ttypes.DecimalType, i: Int128)                  => DecimalLiteral(decodeLongDecimal(dt, i))
         // TODO arrays
         // TODO maps
         // TODO structs

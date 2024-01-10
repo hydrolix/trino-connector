@@ -2,14 +2,17 @@ package io.hydrolix.connector.trino
 
 import scala.jdk.CollectionConverters._
 
-import io.trino.spi.block.LongArrayBlock
+import io.trino.spi.`type`.{TimestampType, VarcharType}
+import io.trino.spi.block.{Fixed12Block, LongArrayBlock, VariableWidthBlock}
 import io.trino.spi.expression.{ConnectorExpression, StandardFunctions}
 import io.trino.spi.predicate.{Domain, EquatableValueSet, SortedRangeSet}
 import io.trino.spi.{`type` => ttypes}
 import org.slf4j.LoggerFactory
 
+import io.hydrolix.connector.trino.Enumerable.{F12BisEnumerable, LABIsEnumerable, VWBIsEnumerable}
 import io.hydrolix.connectors.expr._
-import io.hydrolix.connectors.{microsToInstant, types => coretypes}
+import io.hydrolix.connectors.types.ArrayType
+import io.hydrolix.connectors.{types => coretypes}
 
 object TrinoPredicates {
   private val logger = LoggerFactory.getLogger(getClass)
@@ -44,54 +47,58 @@ object TrinoPredicates {
    * @param domain the Trino Domain to try to translate
    * @return `Some(expr)` if the Domain can be translated to a Core expression, or `None` if not
    */
-  def domainToCore(field: String, domain: Domain): Option[Expr[Boolean]] = {
-    TrinoTypes.trinoToCore(domain.getType) match {
-      case Some(coretypes.StringType) =>
+  def domainToCore(field: String, domain: Domain, offset: Int): Option[Expr[Boolean]] = {
+    domain.getType match {
+      case VarcharType.VARCHAR =>
         domain.getValues match {
           case eq: EquatableValueSet if eq.getType == ttypes.VarcharType.VARCHAR =>
             val strings = collection.mutable.ArrayBuffer[String]()
             for (entry <- eq.getEntries.asScala) {
-              var offset = 0
-              for (i <- 0 until entry.getBlock.getPositionCount) {
-                val len = entry.getBlock.getSliceLength(i)
-                strings += entry.getBlock.getSlice(i, offset, len).toStringUtf8
-                offset += len
-              }
+              // TODO what if there are nulls in it?
+              strings ++= entry.getBlock.asInstanceOf[VariableWidthBlock].all
             }
-            Some(In(GetField(field, coretypes.StringType), ArrayLiteral(strings.toList, coretypes.StringType)))
+            Some(In(GetField(field, coretypes.StringType), ArrayLiteral(strings.toSeq, ArrayType(coretypes.StringType))))
           case _ =>
             logger.warn(s"Can't translate $field: $domain")
             None
         }
-      case Some(coretypes.TimestampType(_)) =>
+
+      case _: TimestampType =>
         domain.getValues match {
           case srs: SortedRangeSet =>
-            srs.getSortedRanges match {
-              case lb: LongArrayBlock =>
-                if (lb.getPositionCount == 2) {
-                  if (lb.isNull(0) && lb.isNull(1)) {
-                    logger.warn("earliest and latest both null?!")
-                    None
-                  } else {
-                    val get = GetField(field, coretypes.TimestampType.Millis)
-                    if (lb.isNull(0)) {
-                      // Lower bound is null; this is <= max
-                      Some(LessEqual(get, TimestampLiteral(microsToInstant(lb.getLong(1, 0)))))
-                    } else if (lb.isNull(1)) {
-                      // Upper bound is null; this is >= min
-                      Some(GreaterEqual(get, TimestampLiteral(microsToInstant(lb.getLong(0, 0)))))
-                    } else {
-                      // Both bounds are present; this is BETWEEN
-                      Some(And(List(
-                        GreaterEqual(get, TimestampLiteral(microsToInstant(lb.getLong(0, 0)))),
-                        LessEqual(get, TimestampLiteral(microsToInstant(lb.getLong(1, 0))))
-                      )))
-                    }
-                  }
-                } else {
-                  logger.warn(s"Got ${lb.getPositionCount} values in LongArrayBlock, expected exactly 2")
-                  None
-                }
+            val block = srs.getSortedRanges
+            if (block.getPositionCount != 2) {
+              logger.warn(s"Timestamp predicate sortedRangeSet had ${block.getPositionCount} values; expected exactly 2")
+              None
+            } else if (block.isNull(0) && block.isNull(1)) {
+              logger.warn(s"Timestamp predicate sortedRangeSet had two null values; expected exactly 1")
+              None
+            } else {
+              val Seq(mLo, mHi) = srs.getSortedRanges match {
+                case lb: LongArrayBlock => lb.asInstants.map(Option(_).map(_.minusSeconds(offset)))
+                case fb: Fixed12Block => fb.asInstants.map(Option(_).map(_.minusSeconds(offset)))
+                case other => sys.error(s"Timestamp range block was ${other.getClass.getSimpleName}; not Long or Fixed12")
+              }
+
+              val get = GetField(field, coretypes.TimestampType.Millis)
+
+              (mLo, mHi) match {
+                case (None, Some(hi)) =>
+                  // Lower bound is null; this is <= max
+                  Some(LessEqual(get, TimestampLiteral(hi)))
+
+                case (Some(lo), None) =>
+                  // Upper bound is null; this is >= min
+                  Some(GreaterEqual(get, TimestampLiteral(lo)))
+
+                case (Some(lo), Some(hi)) =>
+                  // Both bounds are present; this is BETWEEN
+                  Some(And(List(
+                    GreaterEqual(get, TimestampLiteral(lo)),
+                    LessEqual(get, TimestampLiteral(hi))
+                  )))
+                case (None, None) => sys.error("Time range with no bounds!")
+              }
             }
           case other =>
             logger.info(s"No useful conversion for $field: $domain values: $other")

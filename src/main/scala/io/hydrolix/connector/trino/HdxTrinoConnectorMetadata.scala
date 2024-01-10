@@ -1,6 +1,6 @@
 package io.hydrolix.connector.trino
 
-import java.util.Optional
+import java.util.{Optional, OptionalLong}
 import java.{util => ju}
 import scala.jdk.CollectionConverters._
 import scala.jdk.OptionConverters._
@@ -39,6 +39,7 @@ final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: 
       tableName.getTableName,
       ju.Collections.emptyList(), // Don't know which partitions we need to read yet
       ju.Collections.emptyList(), // Don't know which columns we need to read yet
+      OptionalLong.empty()
     )
   }
 
@@ -93,7 +94,6 @@ final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: 
                                   : ju.Optional[ConstraintApplicationResult[ConnectorTableHandle]] =
   {
     val tbl = handle.asInstanceOf[HdxTableHandle]
-
     if (!tbl.splits.isEmpty) {
       // Nothing further to do here
       return ju.Optional.empty()
@@ -101,23 +101,28 @@ final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: 
 
     val hdxTable = catalog.loadTable(List(tbl.db, tbl.table))
 
-    val pk = tbl.columns.asScala
+    val availableColumns = tbl.columns.asScala.toSet ++ constraint.getAssignments.values.asInstanceOf[ju.Collection[HdxColumnHandle]].asScala
+
+    val pk = availableColumns
       .find(_.name == hdxTable.primaryKeyField)
       .getOrElse(sys.error(s"Couldn't find primary key field ${hdxTable.primaryKeyField} in Trino schema"))
 
     val sk = hdxTable.shardKeyField.map { skf =>
-      tbl.columns.asScala
+      availableColumns
         .find(_.name == skf)
         .getOrElse(sys.error(s"Couldn't find shard key field $skf in Trino schema"))
     }
 
+    // TODO this is hinky but I can't find a better alternative right "now()"
+    val offset = session.getTimeZoneKey.getZoneId.getRules.getOffset(session.getStart).getTotalSeconds
+
     val pushed = constraint.getSummary.getDomains.toScala.map(_.asScala).getOrElse(Map()).flatMap {
       case (`pk`, dom) if dom.getType.isInstanceOf[TimestampType] =>
         // Matching on primary timestamp field
-        TrinoPredicates.domainToCore(pk.name, dom)
+        TrinoPredicates.domainToCore(pk.name, dom, offset)
       case (ch: HdxColumnHandle, dom) if sk.contains(ch) && dom.getType == VarcharType.VARCHAR =>
         // Matching on shard key field
-        TrinoPredicates.domainToCore(ch.name, dom)
+        TrinoPredicates.domainToCore(ch.name, dom, offset)
       case other =>
         logger.info(s"Predicate not pushable; will eval after scan: $other")
         None
@@ -141,9 +146,11 @@ final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: 
     val parts = HdxJdbcSession(info).collectPartitions(tbl.db, tbl.table, minTimestamp, maxTimestamp)
 
     // All the partitions that need to be read, stuffed into the TableHandle
+    val tableWithSplits = tbl.withSplits(parts.map(_.toSplit).asJava)
+
     ju.Optional.of(
       new ConstraintApplicationResult(
-        tbl.withSplits(parts.map(_.toSplit).asJava),
+        tableWithSplits,
         constraint.getSummary, // Nothing can be completely pushed -- even shard key can have hash collisions
         false // TODO maybe not?
       ))
@@ -159,6 +166,10 @@ final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: 
     // assignments relate Variable names to ColumnHandles
 
     val tbl = handle.asInstanceOf[HdxTableHandle]
+    if (!tbl.columns.isEmpty) {
+      // Already been here
+      return Optional.empty()
+    }
 
     val assignmentsOut = projections.asScala.flatMap {
       case v: Variable =>
@@ -179,5 +190,25 @@ final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: 
       assignmentsOut.asJava,
       false // TODO maybe not?
     ))
+  }
+
+  override def applyLimit(session: ConnectorSession,
+                           handle: ConnectorTableHandle,
+                            limit: Long)
+                                 : Optional[LimitApplicationResult[ConnectorTableHandle]] =
+  {
+    val tbl = handle.asInstanceOf[HdxTableHandle]
+    if (!tbl.limit.isEmpty) {
+      // Already been here
+      return Optional.empty()
+    }
+
+    Optional.of(
+      new LimitApplicationResult(
+        tbl.withLimit(limit),
+        false, // We only return pages
+        false
+      )
+    )
   }
 }

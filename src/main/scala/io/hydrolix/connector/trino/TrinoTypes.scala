@@ -31,10 +31,10 @@ object TrinoTypes {
         coreToTrino(elt).map(new ttypes.ArrayType(_))
       case coretypes.MapType(kt, vt, _) =>
         for {
-          kt <- coreToTrino(kt)
-          vt <- coreToTrino(vt)
+          tkt <- coreToTrino(kt)
+          tvt <- coreToTrino(vt)
         } yield {
-          new ttypes.MapType(kt, vt, new ttypes.TypeOperators()) // TODO wtf is this?
+          new ttypes.MapType(tkt, tvt, new ttypes.TypeOperators())
         }
       case coretypes.StructType(fields) =>
         val trinoFields = fields.flatMap { fld =>
@@ -58,7 +58,7 @@ object TrinoTypes {
     }
   }
 
-  def trinoToCore(trinoType: ttypes.Type): Option[coretypes.ValueType] = {
+  def trinoToCore(trinoType: ttypes.Type): Option[coretypes.ConcreteType] = {
     trinoType match {
       case ttypes.BooleanType.BOOLEAN             => Some(coretypes.BooleanType)
       case ttypes.VarcharType.VARCHAR             => Some(coretypes.StringType)

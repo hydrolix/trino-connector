@@ -1,0 +1,278 @@
+{
+  "uint32[][]": [
+    [
+      814974301,
+      1441375772,
+      432701393,
+      581491793,
+      1591388854,
+      364864855
+    ],
+    [
+      510291810,
+      1197020048,
+      2009724584,
+      2002080056,
+      2129932344
+    ],
+    [
+      1439537678,
+      1667062111,
+      1279309191,
+      1336063956
+    ]
+  ],
+  "int8": 69,
+  "uint64[]": [
+    11870318484748001023,
+    3638354339508012657,
+    5777367566944852913,
+    4395892586055780037
+  ],
+  "datetime[][]": [
+    []
+  ],
+  "string": "zq0yITnqvAgaceZjC23e3VAOl6pqu+D5mPcPFEsqjGIWnAPl0kdlJM9clbOQiJNOvCCc",
+  "int32": 530127644,
+  "epoch[]": [
+    "1984-06-12T01:29:16.239Z",
+    "2097-06-22T19:15:24.017Z",
+    "2106-09-27T06:24:33.476Z",
+    "2085-07-06T21:54:58.201Z",
+    "2227-06-22T08:29:05.980Z",
+    "2151-06-08T16:43:16.318Z",
+    "2000-06-20T02:51:31.988Z"
+  ],
+  "int32[][]": [
+    [
+      -918106209
+    ],
+    [
+      -1994887202,
+      75988003,
+      423618791,
+      -1880307420,
+      -1889947836
+    ],
+    [
+      906755735,
+      1748319296
+    ],
+    [
+      123237207,
+      null,
+      743961261
+    ],
+    [
+      1342091925,
+      -1628310818,
+      160967160,
+      -1411273924
+    ],
+    [
+      820748621,
+      -1315949056,
+      1686262522,
+      -1554813950,
+      -1803296833,
+      1728930671
+    ]
+  ],
+  "boolean": 1,
+  "string[]": [
+    "fcyPl+/BS9tCJ+eevB8zct3DBle9YC1LqAyj7uwMtwlX1+YDjZ/lTFT5H8MDxLTSms8fC9uM",
+    "EI22NpW/7AzNNnEwMrdoFU7hQA4omDFdb0kfbiElKnJtVg==",
+    "P2Cnif/R5VXdv46FTyuIMhsl/eZR2qSaMvYgroPLZbSZPasXPA6iyzJkHmck/sMHmSx6CCYBu7xOAhNv",
+    "AQs=",
+    "7Wz0jj9KNZMGp2rUm85fnUS7RPKf",
+    "V1ktTER8Ghs6b5P81hbBHiQuWvKRFyLP3A=="
+  ],
+  "double[]": [
+    0.680073,
+    0.449006,
+    0.375284,
+    null,
+    0.613674,
+    0.988292,
+    0.624320
+  ],
+  "uint64": 7474140037800391318,
+  "uint8[][]": [],
+  "epoch[][]": [],
+  "epoch": "2011-02-21T01:38:35.774Z",
+  "boolean[][]": [
+    [],
+    [
+      0,
+      1,
+      0,
+      1,
+      0,
+      1,
+      0
+    ],
+    [
+      null,
+      0,
+      1
+    ],
+    [],
+    [
+      0,
+      1,
+      0,
+      1,
+      null
+    ],
+    [
+      null,
+      1
+    ],
+    [
+      0,
+      0,
+      1,
+      1,
+      1,
+      null,
+      0
+    ]
+  ],
+  "uint8": 115,
+  "int64[][]": [
+    [
+      -1593771989863585849,
+      6575299748344933820,
+      4864818393320422587,
+      -1858732169797816062
+    ],
+    [
+      -5244259830214317229,
+      null,
+      8290602633631904013,
+      1305691287635184516,
+      6016878319132615911,
+      -2405823307214061894,
+      -5342206380222566568
+    ],
+    [],
+    [
+      1917009406267855048,
+      1698554532494994747,
+      1347646116805667812
+    ],
+    [
+      -7222968127264053045,
+      -5146362888300804337
+    ],
+    [
+      -933628392730371208
+    ],
+    [
+      7106621960386423223,
+      1411363283028332277,
+      -4112296805335186955,
+      null,
+      8332098007407929980
+    ]
+  ],
+  "string[][]": [
+    [
+      "T3IqBxXvPob/g4A/F/RBQ0MGcsLuE/GxRIVQTg==",
+      "+mwxkwoPwZwGDaU1wWZg6g==",
+      "uDxXxRRHEO1G9lx9/IqFBjVFJcI=",
+      "9sayUS0nFzlmUJwmvNti4vUOeI4vV85hcJ7majz+DXP+jhWTKzHkDLnADcqAq+zkgdE2u6J1n/zRZw==",
+      "wkk/0qXnBrqsrjVSsDouKoU2o/kFr9ZWZGU="
+    ],
+    [
+      "eoPVTYyn+814pQ65siZZ1jGZCuEDi4LkQjMq29Q86+HixQHwW3t4mF2MnQ==",
+      "qredapuRAJkP5ZkeWhBPqgEWQi1wCjZm9KHRj09nRp1UYx8=",
+      "FCYvyMaq6KX7SC2Lp+SV/w==",
+      "UJzFqioas/B+Zk/BmvPLQQlF",
+      "WxRzwzuiT3D8ljgN139K3mMrAPfKgFFMoyX6DtVsa57C9OtXIynEV7oA1Ks7W2SS1+0=",
+      "ME/gWSPNzNzGoUWgU2/8LzxI3YTwR961ifyazFdCffZGwk8RXg==",
+      "kY/zvBWIkYeBTgC8GKRKOl0pNMPhqErr507HaLqP24TnACDVATM="
+    ],
+    [
+      "EoqQI4OXu18AnsghEA6b/Yx61L+KUNSq",
+      "oIErR48QJA==",
+      null,
+      "u4QfK+vrNgtqekK0Sfr0/f5kUl462a13TG92Cz+BJ5V/XSGi8xhhTgo="
+    ],
+    [
+      "eBir10McLDt7Uum9Dufr+W1oJoF/RFpVHVo23GJ9iTg83O5xtEzjuvkbSYg=",
+      "ahzLAG6HMHxMrRk2AxcCxRg1VtFuuPhVabkYGvlL279o1s80jyXft//mIh9mzJgENmyypjpCsw==",
+      "UBx0ZbydZ4qVg79k5kBz4kvlrgpqYzO0lDqLxJGIZw6jadoGgy053k3FT21wVit9",
+      "6G8q0FqNqSZlGD+l0Uh390y2vws=",
+      "TDKyaK9hVvQHNcaHZMA1VqvisoiAK9QBMhXuK/vE7Tk0QlzVvYN2hw==",
+      "wDe8wg=="
+    ],
+    [
+      "",
+      "xg==",
+      "6VZxjg==",
+      "GYYjJg1kWwOJ8O6sjPdutDOdZUFCWioGQGIa4XmJ8T3kGwxt+g=="
+    ]
+  ],
+  "int8[]": [
+    -107
+  ],
+  "boolean[]": [
+    1
+  ],
+  "datetime[]": [
+    "2029-07-26T04:10:38.556Z",
+    "2165-09-24T10:51:51.556Z",
+    "2027-03-06T19:33:08.156Z",
+    "2032-04-02T09:03:43.812Z",
+    "2179-11-16T04:15:57.549Z",
+    null
+  ],
+  "datetime": "2023-12-06T23:09:13.412Z",
+  "uint32": null,
+  "int32[]": [
+    null,
+    1076995348,
+    -1066090987,
+    1833964010,
+    -893311436
+  ],
+  "uint32[]": [],
+  "double": 0.525106,
+  "uint8[]": [
+    59,
+    60,
+    173,
+    136,
+    155
+  ],
+  "int64": 7604987347650811585,
+  "double[][]": [],
+  "int64[]": [
+    -368949052109952701
+  ],
+  "uint64[][]": [],
+  "int8[][]": [
+    [
+      87,
+      -64,
+      -108,
+      10,
+      37,
+      106,
+      2
+    ],
+    [],
+    [
+      -90,
+      -13
+    ],
+    [
+      null,
+      9,
+      -95,
+      83,
+      -24
+    ]
+  ]
+}
