@@ -48,7 +48,16 @@ class HdxTrinoPageSourceProvider(info: HdxConnectionInfo,
         )
 
         // TODO 1MB isn't really realistic, could be much smaller or much larger
-        new FixedPageSource(reader.stream.iterator, 1L*1024*1024)
+        new FixedPageSource(reader.stream.iterator, 1L*1024*1024) {
+          override def close(): Unit = {
+            try {
+              logger.info("Closing partition reader")
+              reader.close()
+            } finally {
+              super.close()
+            }
+          }
+        }
 
       case None =>
         new EmptyPageSource()

@@ -1,5 +1,3 @@
-ThisBuild / version := "0.1.0-SNAPSHOT"
-
 ThisBuild / scalaVersion := "2.13.12"
 
 ThisBuild / javacOptions ++= Seq("-source", "17", "-target", "17")
@@ -22,7 +20,7 @@ ThisBuild / assemblyMergeStrategy := {
 val trinoVersion = "435"
 
 libraryDependencies := Seq(
-  "io.hydrolix" %% "hydrolix-connectors-core" % "1.3.0-SNAPSHOT",
+  "io.hydrolix" %% "hydrolix-connectors-core" % "1.3.1-SNAPSHOT",
 
   "io.trino" % "trino-spi" % trinoVersion % Provided,
   "io.trino" % "trino-main" % trinoVersion % Provided,

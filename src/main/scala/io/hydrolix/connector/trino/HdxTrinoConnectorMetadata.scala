@@ -8,7 +8,6 @@ import scala.jdk.OptionConverters._
 import io.trino.spi.`type`._
 import io.trino.spi.connector._
 import io.trino.spi.expression.{ConnectorExpression, Variable}
-import io.trino.spi.function.FunctionMetadata
 import org.slf4j.LoggerFactory
 
 import io.hydrolix.connector.trino.HdxTrinoSplitManager.HdxDbPartitionOps
@@ -82,10 +81,6 @@ final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: 
 
       new ColumnMetadata(col.name, trinoType)
     }
-  }
-
-  override def listFunctions(session: ConnectorSession, schemaName: String): ju.Collection[FunctionMetadata] = {
-    ju.Collections.emptyList()
   }
 
   override def applyFilter(session: ConnectorSession,
