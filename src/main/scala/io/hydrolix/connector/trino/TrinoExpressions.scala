@@ -4,6 +4,7 @@ import java.{lang => jl, util => ju}
 import scala.annotation.unused
 import scala.jdk.CollectionConverters._
 
+import com.google.common.collect.ImmutableList
 import io.trino.spi.`type`.{Int128, LongTimestamp}
 import io.trino.spi.expression._
 import io.trino.spi.{`type` => ttypes}
@@ -65,17 +66,23 @@ object TrinoExpressions {
           )
         )
 
-      case And(kids) =>
+      case And(left, right) =>
         new Call(
           ttypes.BooleanType.BOOLEAN,
           StandardFunctions.AND_FUNCTION_NAME,
-          kids.map(coreToTrino(schema, scan, _)).asJava
+          ImmutableList.of(
+            coreToTrino(schema, scan, left),
+            coreToTrino(schema, scan, right)
+          )
         )
-      case Or(kids) =>
+      case Or(left, right) =>
         new Call(
           ttypes.BooleanType.BOOLEAN,
           StandardFunctions.OR_FUNCTION_NAME,
-          kids.map(coreToTrino(schema, scan, _)).asJava
+          ImmutableList.of(
+            coreToTrino(schema, scan, left),
+            coreToTrino(schema, scan, right)
+          )
         )
       case Not(kid) =>
         new Call(

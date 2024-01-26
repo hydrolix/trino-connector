@@ -2,6 +2,8 @@ ThisBuild / scalaVersion := "2.13.12"
 
 ThisBuild / javacOptions ++= Seq("-source", "17", "-target", "17")
 
+ThisBuild / scalacOptions ++= Seq("-deprecation")
+
 lazy val root = (project in file("."))
   .settings(
     name := "hydrolix-trino-connector"
@@ -20,7 +22,7 @@ ThisBuild / assemblyMergeStrategy := {
 val trinoVersion = "435"
 
 libraryDependencies := Seq(
-  "io.hydrolix" %% "hydrolix-connectors-core" % "1.3.1-SNAPSHOT",
+  "io.hydrolix" %% "hydrolix-connectors-core" % "1.4.0-SNAPSHOT",
 
   "io.trino" % "trino-spi" % trinoVersion % Provided,
   "io.trino" % "trino-main" % trinoVersion % Provided,

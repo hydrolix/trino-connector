@@ -20,9 +20,11 @@ object TrinoPredicates {
   def trinoToCore(expr: ConnectorExpression): Expr[Boolean] = {
     expr match {
       case TPred(StandardFunctions.AND_FUNCTION_NAME, args) =>
-        And(args.map(trinoToCore))
+        val preds = args.map(trinoToCore)
+        preds.reduceLeft(And)
       case TPred(StandardFunctions.OR_FUNCTION_NAME, args) =>
-        Or(args.map(trinoToCore))
+        val preds = args.map(trinoToCore)
+        preds.reduceLeft(Or)
       case TPred(StandardFunctions.NOT_FUNCTION_NAME, List(arg)) =>
         Not(trinoToCore(arg))
       case TPred(StandardFunctions.LESS_THAN_OPERATOR_FUNCTION_NAME, List(l, r)) =>
@@ -93,10 +95,10 @@ object TrinoPredicates {
 
                 case (Some(lo), Some(hi)) =>
                   // Both bounds are present; this is BETWEEN
-                  Some(And(List(
+                  Some(And(
                     GreaterEqual(get, TimestampLiteral(lo)),
                     LessEqual(get, TimestampLiteral(hi))
-                  )))
+                  ))
                 case (None, None) => sys.error("Time range with no bounds!")
               }
             }

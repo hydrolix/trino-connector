@@ -1,5 +1,6 @@
 package io.hydrolix.connector.trino
 
+import java.time.Instant
 import java.util.{Optional, OptionalLong}
 import java.{util => ju}
 import scala.jdk.CollectionConverters._
@@ -12,7 +13,7 @@ import org.slf4j.LoggerFactory
 
 import io.hydrolix.connector.trino.HdxTrinoSplitManager.HdxDbPartitionOps
 import io.hydrolix.connectors.expr._
-import io.hydrolix.connectors.{HdxConnectionInfo, HdxJdbcSession, HdxTableCatalog, Types, types => coretypes}
+import io.hydrolix.connectors.{HdxConnectionInfo, HdxJdbcSession, HdxTableCatalog, Types, WyHash, types => coretypes}
 
 final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: HdxTableCatalog) extends ConnectorMetadata {
   private val logger = LoggerFactory.getLogger(getClass)
@@ -109,7 +110,9 @@ final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: 
     }
 
     // TODO this is hinky but I can't find a better alternative right "now()"
-    val offset = session.getTimeZoneKey.getZoneId.getRules.getOffset(session.getStart).getTotalSeconds
+    val offset = session.getTimeZoneKey.getZoneId.getRules
+      .getOffset(Instant.now())
+      .getTotalSeconds
 
     val pushed = constraint.getSummary.getDomains.toScala.map(_.asScala).getOrElse(Map()).flatMap {
       case (`pk`, dom) if dom.getType.isInstanceOf[TimestampType] =>
@@ -134,11 +137,17 @@ final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: 
       case LessThan(GetField(hdxTable.primaryKeyField, coretypes.TimestampType(_)), TimestampLiteral(inst)) => inst.minusSeconds(1)
     }
 
-    if (minTimestamp.isEmpty && maxTimestamp.isEmpty) {
+    val shardKeyHashes = pushed.collectFirst {
+      case Equal(GetField(fld, coretypes.StringType), StringLiteral(s)) if hdxTable.shardKeyField.contains(fld) => Set(s)
+      case In(GetField(fld, coretypes.StringType), ArrayLiteral(ss, coretypes.ArrayType(coretypes.StringType, _), _)) if hdxTable.shardKeyField.contains(fld) =>
+        ss.asInstanceOf[Seq[String]].toSet
+    }.getOrElse(Set()).map(WyHash(_))
+
+    if (minTimestamp.isEmpty && maxTimestamp.isEmpty && shardKeyHashes.isEmpty) {
       logger.warn("No predicates useful for partition pruning, this will be slow :(")
     }
 
-    val parts = HdxJdbcSession(info).collectPartitions(tbl.db, tbl.table, minTimestamp, maxTimestamp)
+    val parts = HdxJdbcSession(info).collectPartitions(tbl.db, tbl.table, minTimestamp, maxTimestamp, shardKeyHashes)
 
     // All the partitions that need to be read, stuffed into the TableHandle
     val tableWithSplits = tbl.withSplits(parts.map(_.toSplit).asJava)
