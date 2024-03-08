@@ -22,7 +22,7 @@ ThisBuild / assemblyMergeStrategy := {
 val trinoVersion = "435"
 
 libraryDependencies := Seq(
-  "io.hydrolix" %% "hydrolix-connectors-core" % "1.4.0-SNAPSHOT",
+  "io.hydrolix" %% "hydrolix-connectors-core" % "1.5.0-SNAPSHOT",
 
   "io.trino" % "trino-spi" % trinoVersion % Provided,
   "io.trino" % "trino-main" % trinoVersion % Provided,

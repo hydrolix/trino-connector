@@ -27,7 +27,7 @@ final class HdxTrinoSplitManager(val info: HdxConnectionInfo, val catalog: HdxTa
     } else {
       // TODO double-check if dynamicFilter or constraint might be non-empty if applyFilter didn't have anything to say?
       val jdbc = HdxJdbcSession(info)
-      val parts = jdbc.collectPartitions(tbl.db, tbl.table, None, None)
+      val parts = jdbc.collectPartitions(tbl.db, tbl.table, None, None, Set())
       new FixedSplitSource(parts.map(_.toSplit).asJava)
     }
   }
