@@ -4,14 +4,11 @@ import scala.jdk.CollectionConverters._
 import scala.jdk.OptionConverters.{RichOption, RichOptional}
 
 import io.trino.spi.connector._
-import org.slf4j.LoggerFactory
 
 import io.hydrolix.connector.trino.HdxTrinoSplitManager.HdxDbPartitionOps
 import io.hydrolix.connectors.{HdxConnectionInfo, HdxDbPartition, HdxJdbcSession, HdxTableCatalog}
 
 final class HdxTrinoSplitManager(val info: HdxConnectionInfo, val catalog: HdxTableCatalog) extends ConnectorSplitManager {
-  private val logger = LoggerFactory.getLogger(getClass)
-
   override def getSplits(transaction: ConnectorTransactionHandle,
                              session: ConnectorSession,
                                table: ConnectorTableHandle,
@@ -46,7 +43,6 @@ object HdxTrinoSplitManager {
       split.memSize,
       split.rootPath,
       split.shardKey,
-      split.active,
       split.storageId.toScala
     )
   }
@@ -63,7 +59,6 @@ object HdxTrinoSplitManager {
       p.memSize,
       p.rootPath,
       p.shardKey,
-      p.active,
       p.storageId.toJava
     )
   }

@@ -5,9 +5,9 @@ import scala.jdk.CollectionConverters._
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node._
+import com.typesafe.scalalogging.Logger
 import io.trino.spi.`type`._
 import io.trino.spi.block._
-import org.slf4j.LoggerFactory
 
 import io.hydrolix.connector.trino.{ArrayOf, MapOf, fixed12ToInstant}
 import io.hydrolix.connectors.{Etc, JSON, microsToInstant}
@@ -80,7 +80,7 @@ case class NestedArrayPrinter(elp: TrinoValuePrinter) extends TrinoValuePrinter 
 }
 
 case class MapPrinter(kp: TrinoValuePrinter, vp: TrinoValuePrinter) extends TrinoValuePrinter {
-  private val logger = LoggerFactory.getLogger(getClass)
+  private val logger = Logger(getClass)
 
   override def print(block: Block, pos: Int): JsonNode = {
     val mb = block.asInstanceOf[MapBlock]

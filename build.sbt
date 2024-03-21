@@ -34,4 +34,5 @@ libraryDependencies := Seq(
 
   "com.github.sbt" % "junit-interface" % "0.13.3" % Test,
   "io.trino" % "trino-spi" % trinoVersion % Test,
+  "io.trino" % "trino-testing" % trinoVersion % Test,
 )

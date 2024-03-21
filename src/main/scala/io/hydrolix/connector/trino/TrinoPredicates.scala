@@ -2,12 +2,12 @@ package io.hydrolix.connector.trino
 
 import scala.jdk.CollectionConverters._
 
+import com.typesafe.scalalogging.Logger
 import io.trino.spi.`type`.{TimestampType, VarcharType}
 import io.trino.spi.block.{Fixed12Block, LongArrayBlock, VariableWidthBlock}
 import io.trino.spi.expression.{ConnectorExpression, StandardFunctions}
 import io.trino.spi.predicate.{Domain, EquatableValueSet, SortedRangeSet}
 import io.trino.spi.{`type` => ttypes}
-import org.slf4j.LoggerFactory
 
 import io.hydrolix.connector.trino.Enumerable.{F12BisEnumerable, LABIsEnumerable, VWBIsEnumerable}
 import io.hydrolix.connectors.expr._
@@ -15,7 +15,7 @@ import io.hydrolix.connectors.types.ArrayType
 import io.hydrolix.connectors.{types => coretypes}
 
 object TrinoPredicates {
-  private val logger = LoggerFactory.getLogger(getClass)
+  private val logger = Logger(getClass)
 
   def trinoToCore(expr: ConnectorExpression): Expr[Boolean] = {
     expr match {

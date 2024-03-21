@@ -6,12 +6,12 @@ import java.{util => ju}
 import scala.annotation.unused
 import scala.jdk.CollectionConverters._
 
+import com.typesafe.scalalogging.Logger
 import io.trino.spi.`type`.TimeZoneKey
 import io.trino.spi.connector._
 import io.trino.spi.security.ConnectorIdentity
 import io.trino.spi.transaction.IsolationLevel
 import io.trino.spi.{Plugin, StandardErrorCode, TrinoException}
-import org.slf4j.LoggerFactory
 
 import io.hydrolix.connectors.{HdxConnectionInfo, HdxTableCatalog}
 
@@ -36,7 +36,7 @@ object HdxTrinoConnectorFactory extends ConnectorFactory {
 }
 
 final class HdxTrinoConnector(val info: HdxConnectionInfo, val catalog: HdxTableCatalog) extends Connector {
-  @unused private val logger = LoggerFactory.getLogger(getClass)
+  @unused private val logger = Logger(getClass)
 
   override def getMetadata(session: ConnectorSession, transactionHandle: ConnectorTransactionHandle): ConnectorMetadata = {
     new HdxTrinoConnectorMetadata(info, catalog)

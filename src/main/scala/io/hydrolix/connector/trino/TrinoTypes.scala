@@ -3,13 +3,13 @@ package io.hydrolix.connector.trino
 import java.util.Optional
 import scala.jdk.CollectionConverters._
 
+import com.typesafe.scalalogging.Logger
 import io.trino.spi.{`type` => ttypes}
-import org.slf4j.LoggerFactory
 
 import io.hydrolix.connectors.{types => coretypes}
 
 object TrinoTypes {
-  private val logger = LoggerFactory.getLogger(getClass)
+  private val logger = Logger(getClass)
 
   def coreToTrino(typ: coretypes.ValueType): Option[ttypes.Type] = {
     typ match {

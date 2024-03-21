@@ -27,7 +27,6 @@ public record HdxTrinoSplit(
   long memSize,
   String rootPath,
   String shardKey,
-  boolean active,
   Optional<UUID> storageId
 ) implements ConnectorSplit {
     @Override

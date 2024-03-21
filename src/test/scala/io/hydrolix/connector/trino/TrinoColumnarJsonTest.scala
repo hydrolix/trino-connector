@@ -105,6 +105,8 @@ class TrinoColumnarJsonTest {
         assertEquals(colsObj.get("map<string,string!>"), mapsJson)
 
         println(s"Got page: $page")
+
+        true
       }
     )
   }
@@ -130,6 +132,8 @@ class TrinoColumnarJsonTest {
       { page =>
         // TODO actually check the contents
         println(page)
+
+        true
       }
     )
   }

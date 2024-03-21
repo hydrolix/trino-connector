@@ -5,16 +5,16 @@ import scala.annotation.unused
 import scala.jdk.CollectionConverters._
 
 import com.google.common.collect.ImmutableList
+import com.typesafe.scalalogging.Logger
 import io.trino.spi.`type`.{Int128, LongTimestamp}
 import io.trino.spi.expression._
 import io.trino.spi.{`type` => ttypes}
-import org.slf4j.LoggerFactory
 
 import io.hydrolix.connectors.expr._
 import io.hydrolix.connectors.{instantToMicros, microsToInstant, types => coretypes}
 
 object TrinoExpressions {
-  @unused private val logger = LoggerFactory.getLogger(getClass)
+  @unused private val logger = Logger(getClass)
 
   def trinoToCore(expr: ConnectorExpression): Expr[_] = {
     if (expr.getType == ttypes.BooleanType.BOOLEAN) {

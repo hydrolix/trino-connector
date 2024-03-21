@@ -6,17 +6,17 @@ import java.{util => ju}
 import scala.jdk.CollectionConverters._
 import scala.jdk.OptionConverters._
 
+import com.typesafe.scalalogging.Logger
 import io.trino.spi.`type`._
 import io.trino.spi.connector._
 import io.trino.spi.expression.{ConnectorExpression, Variable}
-import org.slf4j.LoggerFactory
 
 import io.hydrolix.connector.trino.HdxTrinoSplitManager.HdxDbPartitionOps
 import io.hydrolix.connectors.expr._
 import io.hydrolix.connectors.{HdxConnectionInfo, HdxJdbcSession, HdxTableCatalog, Types, WyHash, types => coretypes}
 
 final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: HdxTableCatalog) extends ConnectorMetadata {
-  private val logger = LoggerFactory.getLogger(getClass)
+  private val logger = Logger(getClass)
 
   override def listSchemaNames(session: ConnectorSession): ju.List[String] = {
     catalog.listNamespaces().map(_.head).asJava

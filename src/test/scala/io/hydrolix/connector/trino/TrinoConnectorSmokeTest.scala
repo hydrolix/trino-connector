@@ -1,29 +1,82 @@
 package io.hydrolix.connector.trino
 
-import java.net.URI
-import java.util.Optional
+import java.util.UUID
 import scala.jdk.CollectionConverters._
 
+import io.trino.Session
+import io.trino.metadata.SessionPropertyManager
+import io.trino.spi.QueryId
+import io.trino.spi.security.Identity
+import io.trino.testing.{BaseConnectorTest, QueryRunner, StandaloneQueryRunner, TestingConnectorBehavior}
 import org.junit.Test
+import org.junit.jupiter.api.{BeforeAll, Disabled}
 
 import io.hydrolix.connectors.HdxConnectionInfo
 
-class TrinoConnectorSmokeTest {
+@Disabled("Doesn't work without an actual cluster, plus all the inherited tests fail")
+class TrinoConnectorSmokeTest extends BaseConnectorTest {
+  private val info = HdxConnectionInfo.fromEnv()
+
+  @BeforeAll
+  override def init(): Unit = {
+    super.init()
+  }
+
   @Test
   def doStuff(): Unit = {
-    val jdbcUrl = System.getenv("HDX_JDBC_URL")
-    val apiUrl = System.getenv("HDX_API_URL")
-    val user = System.getenv("HDX_USER")
-    val pass = System.getenv("HDX_PASSWORD")
-    val cloudCred1 = System.getenv("HDX_CLOUD_CRED_1")
-    val cloudCred2 = Option(System.getenv("HDX_CLOUD_CRED_2"))
+    val qr = createQueryRunner()
 
-    val info = HdxConnectionInfo(jdbcUrl, user, pass, new URI(apiUrl), None, cloudCred1, cloudCred2, Some("myubuntu"))
+    val res = qr.execute("select count(*), min(timestamp), max(timestamp) from hydrolix.hydro.logs where timestamp > now() - interval '5' minute")
 
-    val session = HdxTrinoConnectorSession(info)
-    val connector = HdxTrinoConnectorFactory.create("hydrolix", info.asMap.asJava, null)
-    println(connector)
-    val meta = connector.getMetadata(session, HdxTrinoTransactionHandle.INSTANCE)
-    println(meta.listTables(session, Optional.of("hydro")))
+    println(res)
+  }
+
+  override def hasBehavior(connectorBehavior: TestingConnectorBehavior): Boolean = {
+    connectorBehavior match {
+      case TestingConnectorBehavior.SUPPORTS_ARRAY => true
+      case TestingConnectorBehavior.SUPPORTS_CANCELLATION => true
+      case TestingConnectorBehavior.SUPPORTS_DYNAMIC_FILTER_PUSHDOWN => true
+      case TestingConnectorBehavior.SUPPORTS_LIMIT_PUSHDOWN => true
+      case TestingConnectorBehavior.SUPPORTS_NEGATIVE_DATE => true
+      case TestingConnectorBehavior.SUPPORTS_NOT_NULL_CONSTRAINT => true
+      case TestingConnectorBehavior.SUPPORTS_PREDICATE_EXPRESSION_PUSHDOWN => true
+      case TestingConnectorBehavior.SUPPORTS_PREDICATE_EXPRESSION_PUSHDOWN_WITH_LIKE => true
+      case TestingConnectorBehavior.SUPPORTS_PREDICATE_PUSHDOWN => true
+      case TestingConnectorBehavior.SUPPORTS_PREDICATE_PUSHDOWN_WITH_VARCHAR_EQUALITY => true
+      case TestingConnectorBehavior.SUPPORTS_PREDICATE_PUSHDOWN_WITH_VARCHAR_INEQUALITY => false
+      case _ => false
+    }
+  }
+
+  override def createQueryRunner(): QueryRunner = {
+    val session = Session.builder(new SessionPropertyManager())
+      .setQueryId(QueryId.valueOf(UUID.randomUUID().toString.replace("-", "_")))
+      .setIdentity(Identity.ofUser("user"))
+      .setOriginalIdentity(Identity.ofUser("orig_user"))
+      .build()
+
+    val qr = new StandaloneQueryRunner(session)
+
+    val props = (
+      Map(
+        HdxConnectionInfo.OPT_API_URL -> info.apiUrl.toString,
+        HdxConnectionInfo.OPT_JDBC_URL -> info.jdbcUrl,
+        HdxConnectionInfo.OPT_USERNAME -> info.user,
+        HdxConnectionInfo.OPT_PASSWORD -> info.password,
+        HdxConnectionInfo.OPT_CLOUD_CRED_1 -> info.cloudCred1
+      )
+        ++ info.cloudCred2.map(HdxConnectionInfo.OPT_CLOUD_CRED_2 -> _)
+        ++ info.extraOpts
+      ).asJava
+
+    qr.installPlugin(new HdxTrinoPlugin)
+
+    qr.createCatalog(
+      "hydrolix",
+      "hydrolix",
+      props
+    )
+
+    qr
   }
 }

@@ -5,8 +5,8 @@ import scala.annotation.unused
 import scala.jdk.CollectionConverters._
 import scala.jdk.OptionConverters._
 
+import com.typesafe.scalalogging.Logger
 import io.trino.spi.connector._
-import org.slf4j.LoggerFactory
 
 import io.hydrolix.connector.trino.HdxTrinoSplitManager.TrinoSplitOps
 import io.hydrolix.connectors.{HdxConnectionInfo, HdxPushdown, HdxTableCatalog, types => coretypes}
@@ -15,7 +15,7 @@ class HdxTrinoPageSourceProvider(info: HdxConnectionInfo,
                               catalog: HdxTableCatalog)
   extends ConnectorPageSourceProvider
 {
-  @unused private val logger = LoggerFactory.getLogger(getClass)
+  @unused private val logger = Logger(getClass)
 
   override def createPageSource(transaction: ConnectorTransactionHandle,
                                     session: ConnectorSession,
@@ -41,7 +41,6 @@ class HdxTrinoPageSourceProvider(info: HdxConnectionInfo,
         val reader = new HdxTrinoColumnarReader(
           info,
           hdxTable.storages.getOrElse(scan.storageId, sys.error(s"No storage #${scan.storageId}")),
-          hdxTable.primaryKeyField,
           scan,
           emptyPage,
           handle.limit.toScala
