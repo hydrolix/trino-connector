@@ -25,7 +25,7 @@ object TrinoTypes {
       case coretypes.Float64Type       => Some(ttypes.DoubleType.DOUBLE)
       case coretypes.StringType        => Some(ttypes.VarcharType.VARCHAR)
       case coretypes.BooleanType       => Some(ttypes.BooleanType.BOOLEAN)
-      case coretypes.TimestampType(p)  => Some(ttypes.TimestampType.createTimestampType(p))
+      case coretypes.TimestampType(p)  => Some(ttypes.TimestampWithTimeZoneType.createTimestampWithTimeZoneType(p))
       case coretypes.DecimalType(p, s) => Some(ttypes.DecimalType.createDecimalType(p, s))
       case coretypes.ArrayType(elt, _) =>
         coreToTrino(elt).map(new ttypes.ArrayType(_))
@@ -69,6 +69,10 @@ object TrinoTypes {
       case ttypes.TimestampType.TIMESTAMP_SECONDS => Some(coretypes.TimestampType.Seconds)
       case ttypes.TimestampType.TIMESTAMP_MILLIS  => Some(coretypes.TimestampType.Millis)
       case ttypes.TimestampType.TIMESTAMP_MICROS  => Some(coretypes.TimestampType.Micros)
+      case ttypes.TimestampWithTimeZoneType.TIMESTAMP_TZ_SECONDS => Some(coretypes.TimestampType.Seconds)
+      case ttypes.TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS  => Some(coretypes.TimestampType.Millis)
+      case ttypes.TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS  => Some(coretypes.TimestampType.Micros)
+      case ttypes.TimestampWithTimeZoneType.TIMESTAMP_TZ_NANOS   => Some(coretypes.TimestampType.Nanos)
       case at: ttypes.ArrayType =>
         trinoToCore(at.getElementType).map { typ =>
           coretypes.ArrayType(typ, true)

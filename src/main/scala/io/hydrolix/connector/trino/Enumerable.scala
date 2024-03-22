@@ -1,13 +1,14 @@
 package io.hydrolix.connector.trino
 
-import java.time.Instant
+import java.time.{Instant, ZoneOffset}
 import java.{lang => jl}
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 import io.airlift.slice.Slice
-import io.trino.spi.block.{ByteArrayBlock, Fixed12Block, IntArrayBlock, LongArrayBlock, VariableWidthBlock}
-
-import io.hydrolix.connectors.microsToInstant
+import io.forktrino.`type`.DateTimes
+import io.trino.spi.`type`.{TimestampType, TimestampWithTimeZoneType}
+import io.trino.spi.block._
 
 /**
  * Things that can be rendered from a collection of nullable B values to a collection of nullable T values
@@ -36,6 +37,34 @@ trait Enumerable[B >: Null <: AnyRef, T >: Null <: AnyRef] {
   }
 }
 
+object TimestampDecoding {
+  def asInstants(block: Block, tt: TimestampType): List[Instant] = {
+    val out = ArrayBuffer[Instant]()
+    for (i <- 0 until block.getPositionCount) {
+      if (block.isNull(i)) {
+        out += null
+      } else {
+        val zdt = DateTimes.toLocalDateTime(tt, block, i)
+        out += zdt.toInstant(ZoneOffset.UTC)
+      }
+    }
+    out.toList
+  }
+
+  def asInstants(block: Block, tt: TimestampWithTimeZoneType): List[Instant] = {
+    val out = ArrayBuffer[Instant]()
+    for (i <- 0 until block.getPositionCount) {
+      if (block.isNull(i)) {
+        out += null
+      } else {
+        val zdt = DateTimes.toZonedDateTime(tt, block, i)
+        out += zdt.toInstant
+      }
+    }
+    out.toList
+  }
+}
+
 object Enumerable {
   implicit class VWBIsEnumerable(val block: VariableWidthBlock) extends Enumerable[Slice, String] {
     override val size: Int = block.getPositionCount
@@ -47,12 +76,6 @@ object Enumerable {
     override val size: Int = block.getPositionCount
     override def get(i: Int): jl.Long = if (block.isNull(i)) null else block.getLong(i)
     override def unbox(t: jl.Long): jl.Long = t
-
-    def asInstants: List[Instant] = {
-      all.map { l =>
-        if (l == null) null else microsToInstant(l)
-      }
-    }
   }
 
   implicit class IABIsEnumerable(val block: IntArrayBlock) extends Enumerable[jl.Integer, jl.Integer] {
@@ -81,13 +104,5 @@ object Enumerable {
     }
 
     override def unbox(t: (Long, Int)): (Long, Int) = t
-
-    def asInstants: List[Instant] = {
-      all.map {
-        case null => null
-        case (l, i) => fixed12ToInstant(l, i)
-      }
-    }
   }
-
 }

@@ -1,5 +1,6 @@
 package io.hydrolix.connector.trino.json.print
 
+import java.time.Instant
 import java.{lang => jl}
 import scala.jdk.CollectionConverters._
 
@@ -29,6 +30,8 @@ object TrinoValuePrinter {
       case BooleanType.BOOLEAN             => BooleanPrinter
       case tt: TimestampType if tt.isShort => ShortTimestampPrinter(tt)
       case tt: TimestampType               => LongTimestampPrinter(tt)
+      case tt: TimestampWithTimeZoneType if tt.isShort => ShortTimestampTZPrinter(tt)
+      case tt: TimestampWithTimeZoneType               => LongTimestampTZPrinter(tt)
       case dt: DecimalType if dt.isShort   => ShortDecimalPrinter(dt)
       case dt: DecimalType                 => LongDecimalPrinter(dt)
 
@@ -191,6 +194,43 @@ case class LongTimestampPrinter(tt: TimestampType) extends TrinoValuePrinter {
   override def print(block: Block, pos: Int): JsonNode = {
     val inst = fixed12ToInstant(block.asInstanceOf[Fixed12Block].getFixed12First(pos), block.asInstanceOf[Fixed12Block].getFixed12Second(pos))
     TextNode.valueOf(inst.toString)
+  }
+}
+
+case class ShortTimestampTZPrinter(tt: TimestampWithTimeZoneType) extends TrinoValuePrinter {
+  override def print(block: Block, pos: Int): JsonNode = {
+    val packed = block.asInstanceOf[LongArrayBlock].getLong(pos)
+    val millis = DateTimeEncoding.unpackMillisUtc(packed)
+    val zone = DateTimeEncoding.unpackZoneKey(packed)
+    if (zone != TimeZoneKey.UTC_KEY) sys.error(s"oh noes a non-UTC time zone: ${zone}")
+    val inst = Instant.ofEpochMilli(millis)
+    TextNode.valueOf(inst.toString)
+  }
+}
+
+case class LongTimestampTZPrinter(tt: TimestampWithTimeZoneType) extends TrinoValuePrinter {
+  override def print(block: Block, pos: Int): JsonNode = {
+    val packedEpochMillis = block.asInstanceOf[Fixed12Block].getFixed12First(pos)
+    val picosOfMilli = block.asInstanceOf[Fixed12Block].getFixed12Second(pos)
+
+    val inst = LongTimestampTZPrinter.decodeInstant(packedEpochMillis, picosOfMilli)
+    TextNode.valueOf(inst.toString)
+  }
+}
+
+object LongTimestampTZPrinter {
+  def decodeInstant(packedEpochMillis: Long, picos: Int): Instant = {
+    val millis = DateTimeEncoding.unpackMillisUtc(packedEpochMillis)
+    val timeZoneKey = DateTimeEncoding.unpackZoneKey(packedEpochMillis)
+
+    if (timeZoneKey != TimeZoneKey.UTC_KEY) {
+      sys.error(s"Got a non-UTC timestamp, wtf? $timeZoneKey")
+    }
+
+    val lt = LongTimestampWithTimeZone.fromEpochMillisAndFraction(millis, picos, timeZoneKey)
+
+    // TODO we're discarding picos here
+    Instant.ofEpochMilli(lt.getEpochMillis)
   }
 }
 

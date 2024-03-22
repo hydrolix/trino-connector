@@ -109,18 +109,13 @@ final class HdxTrinoConnectorMetadata(val info: HdxConnectionInfo, val catalog: 
         .getOrElse(sys.error(s"Couldn't find shard key field $skf in Trino schema"))
     }
 
-    // TODO this is hinky but I can't find a better alternative right "now()"
-    val offset = session.getTimeZoneKey.getZoneId.getRules
-      .getOffset(Instant.now())
-      .getTotalSeconds
-
     val pushed = constraint.getSummary.getDomains.toScala.map(_.asScala).getOrElse(Map()).flatMap {
-      case (`pk`, dom) if dom.getType.isInstanceOf[TimestampType] =>
+      case (`pk`, dom) if dom.getType.isInstanceOf[TimestampWithTimeZoneType] =>
         // Matching on primary timestamp field
-        TrinoPredicates.domainToCore(pk.name, dom, offset)
+        TrinoPredicates.domainToCore(pk.name, dom)
       case (ch: HdxColumnHandle, dom) if sk.contains(ch) && dom.getType == VarcharType.VARCHAR =>
         // Matching on shard key field
-        TrinoPredicates.domainToCore(ch.name, dom, offset)
+        TrinoPredicates.domainToCore(ch.name, dom)
       case other =>
         logger.info(s"Predicate not pushable; will eval after scan: $other")
         None

@@ -3,13 +3,14 @@ package io.hydrolix.connector.trino
 import scala.jdk.CollectionConverters._
 
 import com.typesafe.scalalogging.Logger
-import io.trino.spi.`type`.{TimestampType, VarcharType}
+import io.trino.spi.`type`.{TimestampWithTimeZoneType, VarcharType}
 import io.trino.spi.block.{Fixed12Block, LongArrayBlock, VariableWidthBlock}
 import io.trino.spi.expression.{ConnectorExpression, StandardFunctions}
 import io.trino.spi.predicate.{Domain, EquatableValueSet, SortedRangeSet}
 import io.trino.spi.{`type` => ttypes}
 
-import io.hydrolix.connector.trino.Enumerable.{F12BisEnumerable, LABIsEnumerable, VWBIsEnumerable}
+import io.hydrolix.connector.trino.Enumerable.VWBIsEnumerable
+import io.hydrolix.connector.trino.TimestampDecoding.asInstants
 import io.hydrolix.connectors.expr._
 import io.hydrolix.connectors.types.ArrayType
 import io.hydrolix.connectors.{types => coretypes}
@@ -49,7 +50,7 @@ object TrinoPredicates {
    * @param domain the Trino Domain to try to translate
    * @return `Some(expr)` if the Domain can be translated to a Core expression, or `None` if not
    */
-  def domainToCore(field: String, domain: Domain, offset: Int): Option[Expr[Boolean]] = {
+  def domainToCore(field: String, domain: Domain): Option[Expr[Boolean]] = {
     domain.getType match {
       case VarcharType.VARCHAR =>
         domain.getValues match {
@@ -65,7 +66,7 @@ object TrinoPredicates {
             None
         }
 
-      case _: TimestampType =>
+      case ttz: TimestampWithTimeZoneType =>
         domain.getValues match {
           case srs: SortedRangeSet =>
             val block = srs.getSortedRanges
@@ -77,8 +78,8 @@ object TrinoPredicates {
               None
             } else {
               val Seq(mLo, mHi) = srs.getSortedRanges match {
-                case lb: LongArrayBlock => lb.asInstants.map(Option(_).map(_.minusSeconds(offset)))
-                case fb: Fixed12Block => fb.asInstants.map(Option(_).map(_.minusSeconds(offset)))
+                case lb: LongArrayBlock => asInstants(lb, ttz).map(Option(_))
+                case fb: Fixed12Block => asInstants(fb, ttz).map(Option(_))
                 case other => sys.error(s"Timestamp range block was ${other.getClass.getSimpleName}; not Long or Fixed12")
               }
 

@@ -26,6 +26,8 @@ object TrinoValueParser {
       case BooleanType.BOOLEAN             => BooleanParser
       case tt: TimestampType if tt.isShort => ShortTimestampParser(tt.getPrecision)
       case tt: TimestampType               => LongTimestampParser(tt.getPrecision)
+      case tt: TimestampWithTimeZoneType if tt.isShort => ShortTimestampTZParser(tt.getPrecision)
+      case tt: TimestampWithTimeZoneType               => LongTimestampTZParser(tt.getPrecision)
       case dt: DecimalType if dt.isShort   => ShortDecimalParser(dt.getPrecision)
       case dt: DecimalType                 => LongDecimalParser(dt.getPrecision)
 
@@ -39,6 +41,8 @@ object TrinoValueParser {
       case ArrayOf(BooleanType.BOOLEAN)             => ScalarArrayParser(BooleanParser)
       case ArrayOf(tt: TimestampType) if tt.isShort => ScalarArrayParser(ShortTimestampParser(tt.getPrecision))
       case ArrayOf(tt: TimestampType)               => ScalarArrayParser(LongTimestampParser(tt.getPrecision))
+      case ArrayOf(tt: TimestampWithTimeZoneType) if tt.isShort => ScalarArrayParser(ShortTimestampTZParser(tt.getPrecision))
+      case ArrayOf(tt: TimestampWithTimeZoneType)               => ScalarArrayParser(LongTimestampTZParser(tt.getPrecision))
       case ArrayOf(dt: DecimalType) if dt.isShort   => ScalarArrayParser(ShortDecimalParser(dt.getPrecision))
       case ArrayOf(dt: DecimalType)                 => ScalarArrayParser(LongDecimalParser(dt.getPrecision))
 

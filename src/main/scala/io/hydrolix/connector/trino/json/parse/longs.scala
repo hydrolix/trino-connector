@@ -4,7 +4,7 @@ import java.{lang => jl}
 import scala.collection.mutable
 
 import com.fasterxml.jackson.core.{JsonParser, JsonToken}
-import io.trino.spi.`type`.{DecimalType, Decimals, TimestampType}
+import io.trino.spi.`type`._
 import io.trino.spi.block.{BlockBuilder, LongArrayBlockBuilder}
 
 import io.hydrolix.connectors.{Etc, instantToMicros}
@@ -37,10 +37,26 @@ object ShortTimestampParser {
   private val values = Map(
     0 -> new ShortTimestampParser(TimestampType.createTimestampType(0)),
     3 -> new ShortTimestampParser(TimestampType.createTimestampType(3)),
-    6 -> new ShortTimestampParser(TimestampType.createTimestampType(6)),
   )
 
   def apply(precision: Int): ShortTimestampParser = values.getOrElse(precision, sys.error(s"Can't handle short timestamps of precision $precision"))
+}
+
+case class ShortTimestampTZParser private(trinoType: TimestampWithTimeZoneType) extends LongParser {
+  override def parse(parser: JsonParser) = {
+    val inst = parseTimestamp(parser, trinoType.getPrecision)
+
+    // Stop claiming to support micros precision, because this only uses millis
+    DateTimeEncoding.packDateTimeWithZone(inst.toEpochMilli, TimeZoneKey.UTC_KEY)
+  }
+}
+object ShortTimestampTZParser {
+  private val values = Map(
+    0 -> new ShortTimestampTZParser(TimestampWithTimeZoneType.TIMESTAMP_TZ_SECONDS),
+    3 -> new ShortTimestampTZParser(TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS),
+  )
+
+  def apply(precision: Int): ShortTimestampTZParser = values.getOrElse(precision, sys.error(s"Can't handle short timestamps of precision $precision"))
 }
 
 case object DoubleParser extends LongParser {
