@@ -12,8 +12,8 @@ clusters directly, without ETL.
 ## System Requirements
 
 * Trino 435 
-  * The examples here have 
-* Worker nodes must be recent (>=2022) x64 Linux. For local development on other machines, you can use Docker 
+* Worker nodes must be recent (>=2022) x64 Linux. For local development on other machines, you can try Docker, 
+  using [this configuration parameter](https://github.com/hydrolix/connectors-core?tab=readme-ov-file#configuration).  
 
 ## Building
 
